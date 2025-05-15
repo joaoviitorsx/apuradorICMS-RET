@@ -1,7 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
 
-# Configuração padrão para conexão
 HOST = 'localhost'
 USUARIO = 'root'
 SENHA = '123456'
