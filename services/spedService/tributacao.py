@@ -42,7 +42,6 @@ async def criar_e_preencher_c170nova(nome_banco):
     cursor.executemany(insert_query, dados)
     conexao.commit()
 
-    # Atualizar descr_compl e cod_ncm a partir da tabela 0200
     cursor.execute("""
         UPDATE c170nova n
         JOIN `0200` o ON n.cod_item = o.cod_item

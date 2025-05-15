@@ -23,7 +23,6 @@ async def clonar_tabela_c170(nome_banco):
         conexao.commit()
         print("Dados inseridos na tabela c170_clone com sucesso.")
 
-        # Atualizar descr_compl com base na cadastro_tributacao
         cursor.execute("""
             UPDATE c170_clone c
             JOIN cadastro_tributacao t ON c.cod_item = t.codigo
