@@ -1,0 +1,101 @@
+from PySide6 import QtWidgets, QtGui, QtCore
+from db.conexao import conectar_banco, fechar_banco, tabela_empresa
+from ui.telaPrincipal import MainWindow
+from ui.cadastroEmpresa import EmpresaCadastro
+from utils.mensagem import mensagem_aviso
+from utils.icone import usar_icone
+
+class EmpresaWindow(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('Apurado de ICMS - Empresas')
+        self.setGeometry(200, 200, 900, 700)
+        self.setStyleSheet('background-color: #030d18;')
+
+        self.banco_empresas = 'empresas_db'
+
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setSpacing(10)
+
+        self.label_titulo = QtWidgets.QLabel('Escolha ou cadastre uma empresa')
+        self.label_titulo.setStyleSheet("font-size: 20px; font-weight: bold; color: #ffffff;")
+        self.label_titulo.setAlignment(QtCore.Qt.AlignCenter)
+        self.layout.addStretch()
+        self.layout.addWidget(self.label_titulo)
+
+        self.layout.addSpacing(20)
+
+        self.combo_empresas = QtWidgets.QComboBox()
+        self.combo_empresas.setStyleSheet("font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; color:rgb(255, 255, 255);")
+        self.combo_empresas.setFixedWidth(400)
+        self.carregar_empresas()
+        self.layout.addWidget(self.combo_empresas, alignment=QtCore.Qt.AlignCenter)
+
+        self.layout.addSpacing(20)
+
+        self.entrar_btn = QtWidgets.QPushButton('Entrar')
+        self.entrar_btn.setStyleSheet(self._estilo_botao())
+        self.entrar_btn.setFixedWidth(400)
+        self.entrar_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.entrar_btn.clicked.connect(self.entrar)
+        self.layout.addWidget(self.entrar_btn, alignment=QtCore.Qt.AlignCenter)
+
+        self.layout.addSpacing(10)
+        self.cadastrar_btn = QtWidgets.QPushButton('Cadastrar Empresa')
+        self.cadastrar_btn.setStyleSheet(self._estilo_botao())
+        self.cadastrar_btn.setFixedWidth(400)
+        self.cadastrar_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.cadastrar_btn.clicked.connect(self.cadastrar_empresa)
+        self.layout.addWidget(self.cadastrar_btn, alignment=QtCore.Qt.AlignCenter)
+
+        self.layout.addStretch()
+        self.setLayout(self.layout)
+
+    def _estilo_botao(self):
+        return """QPushButton {
+            font-size: 20px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #001F3F;
+            color: #ffffff;
+        }
+        QPushButton:hover {
+            background-color: #005588;
+            color:#ffffff;
+        }"""
+
+    def entrar(self):
+        empresa = self.combo_empresas.currentText()
+        if empresa == "Selecione uma empresa":
+            mensagem_aviso("Selecione uma empresa.")
+            return
+        self.janela_principal = MainWindow(empresa)
+        usar_icone(self.janela_principal)
+        self.janela_principal.showMaximized()
+        self.close()
+
+    def cadastrar_empresa(self):
+        self.empresa_cadastro = EmpresaCadastro(self.banco_empresas)
+        usar_icone(self.empresa_cadastro)
+        self.empresa_cadastro.showMaximized()
+        self.close()
+
+    def carregar_empresas(self):
+        conexao = conectar_banco(self.banco_empresas)
+        tabela_empresa(conexao)
+        try:
+            cursor = conexao.cursor()
+            cursor.execute(f"USE {self.banco_empresas}")
+            cursor.execute("SELECT razao_social FROM empresas ORDER BY razao_social ASC")
+            empresas = [row[0] for row in cursor.fetchall()]
+            self.combo_empresas.clear()
+            self.combo_empresas.addItem("Selecione uma empresa")
+            self.combo_empresas.addItems(empresas)
+            self.combo_empresas.model().item(0).setEnabled(False)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao acessar o banco de dados: {e}")
+        finally:
+            if conexao.is_connected():
+                cursor.close()
+                fechar_banco(conexao)
