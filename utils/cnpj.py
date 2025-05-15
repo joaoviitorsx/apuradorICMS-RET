@@ -4,8 +4,7 @@ import re
 from functools import wraps
 from time import time
 
-# Função para criar cache
-def create_cache(ttl=3600):  # Tempo de vida padrão de 1 hora
+def create_cache(ttl=3600):
     cache_dict = {}
     def decorator(func):
         @wraps(func)
@@ -22,7 +21,6 @@ def create_cache(ttl=3600):  # Tempo de vida padrão de 1 hora
         return wrapper
     return decorator
 
-# Função otimizada para remover caracteres não numéricos
 def remover_caracteres_nao_numericos(valor):
     return re.sub(r'\D', '', valor)
 
@@ -35,14 +33,12 @@ lista_cnaes = [
     '4772500', '4763601'
 ]
 
-# Dicionário para armazenar resultados em cache
 cache_resultados = {}
 
-# Função otimizada para buscar informações do decreto e CNAE
 @create_cache()
 async def buscar_informacoes(cnpj):
     url = f'https://minhareceita.org/{cnpj}'
-    timeout = aiohttp.ClientTimeout(total=10)  # Timeout de 10 segundos
+    timeout = aiohttp.ClientTimeout(total=10)
     
     async with aiohttp.ClientSession(timeout=timeout) as session:
         try:
@@ -65,49 +61,32 @@ async def buscar_informacoes(cnpj):
             print(f"Ocorreu um erro ao buscar informações para o CNPJ {cnpj}: {e}")
             return None, None
 
-# Função para processar uma lista de CNPJs
 async def processar_cnpjs(cnpjs):
     resultados = {}
     tasks = []
     for cnpj in cnpjs:
         if cnpj in cache_resultados:
-            # Se o CNPJ já estiver no cache, usa o resultado armazenado
             resultados[cnpj] = cache_resultados[cnpj]
         else:
-            # Se o CNPJ não estiver no cache, cria uma tarefa para a requisição assíncrona
             tasks.append(_processar_cnpj(cnpj, resultados))
     
     await asyncio.gather(*tasks)
     return resultados
 
-# Função auxiliar para processar cada CNPJ individualmente
 async def _processar_cnpj(cnpj, resultados):
     cnae_codigo, existe_no_lista, uf, simples = await buscar_informacoes(cnpj)
     resultados[cnpj] = (cnae_codigo, existe_no_lista, uf, simples)
     cache_resultados[cnpj] = (cnae_codigo, existe_no_lista, uf, simples)
 
 def validar_cnpj(cnpj):
-    """
-    Valida um CNPJ.
-    
-    Args:
-        cnpj: String contendo o CNPJ a ser validado
-        
-    Returns:
-        bool: True se o CNPJ for válido, False caso contrário
-    """
-    # Remove caracteres não numéricos
     cnpj = ''.join(filter(str.isdigit, cnpj))
     
-    # Verifica se tem 14 dígitos
     if len(cnpj) != 14:
         return False
         
-    # Verifica se todos os dígitos são iguais
     if cnpj == cnpj[0] * 14:
         return False
         
-    # Validação do primeiro dígito verificador
     soma = 0
     peso = 5
     for i in range(12):
@@ -121,7 +100,6 @@ def validar_cnpj(cnpj):
     if int(cnpj[12]) != digito1:
         return False
         
-    # Validação do segundo dígito verificador
     soma = 0
     peso = 6
     for i in range(13):
@@ -138,15 +116,6 @@ def validar_cnpj(cnpj):
     return True
 
 def formatar_cnpj(cnpj):
-    """
-    Formata um CNPJ no padrão XX.XXX.XXX/XXXX-XX.
-    
-    Args:
-        cnpj: String contendo o CNPJ a ser formatado
-        
-    Returns:
-        str: CNPJ formatado
-    """
     cnpj = ''.join(filter(str.isdigit, cnpj))
     return f"{cnpj[:2]}.{cnpj[2:5]}.{cnpj[5:8]}/{cnpj[8:12]}-{cnpj[12:]}"
 
