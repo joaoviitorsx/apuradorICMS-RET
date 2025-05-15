@@ -6,7 +6,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
     cursor = conexao.cursor()
 
     try:
-        # Verifica se as colunas cnae, decreto, uf, simples existem
         cursor.execute("""
             SHOW COLUMNS FROM cadastro_fornecedores
             WHERE Field IN ('cnae', 'decreto', 'uf', 'simples')
@@ -17,7 +16,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
             print("Colunas obrigatórias ausentes na tabela cadastro_fornecedores.")
             return
 
-        # Seleciona fornecedores novos (estão na 0150 mas não estão na cadastro_fornecedores)
         cursor.execute("""
             SELECT f.cod_part, f.nome, f.cnpj
             FROM `0150` f
@@ -32,7 +30,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
                 VALUES (%s, %s, %s, '', '', '', '')
             """, (cod_part, nome, cnpj))
 
-        # Busca CNPJs que precisam ser atualizados
         cursor.execute("""
             SELECT cnpj FROM cadastro_fornecedores
             WHERE (cnae IS NULL OR cnae = '') AND (decreto IS NULL OR decreto = '') AND (uf IS NULL OR uf = '')
