@@ -1,5 +1,4 @@
 from PySide6 import QtWidgets, QtCore, QtGui
-from ui.telaEmpresa import EmpresaWindow
 from utils.mensagem import mensagem_error, mensagem_sucesso
 from utils.icone import usar_icone
 import re
@@ -107,6 +106,7 @@ class EmpresaCadastro(QtWidgets.QWidget):
         mensagem_error(f"Erro ao cadastrar: {erro}")
 
     def voltar(self):
+        from ui.telaEmpresa import EmpresaWindow
         self.empresas = EmpresaWindow()
         usar_icone(self.empresas)
         self.empresas.showMaximized()
