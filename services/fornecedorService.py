@@ -3,7 +3,6 @@ from utils.cnpj import processar_cnpjs
 from utils.mensagem import mensagem_error, mensagem_sucesso
 import logging
 
-# Opcional: configure o logger uma vez
 logging.basicConfig(level=logging.INFO)
 
 async def comparar_adicionar_atualizar_fornecedores(nome_banco):
@@ -11,7 +10,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
     cursor = conexao.cursor()
 
     try:
-        # Verifica se as colunas obrigatórias existem
         cursor.execute("""
             SHOW COLUMNS FROM cadastro_fornecedores
             WHERE Field IN ('cnae', 'decreto', 'uf', 'simples')
@@ -22,7 +20,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
             mensagem_error("Colunas obrigatórias ausentes na tabela 'cadastro_fornecedores'.")
             return
 
-        # Insere novos fornecedores encontrados na 0150 que ainda não estão cadastrados
         cursor.execute("""
             SELECT f.cod_part, f.nome, f.cnpj
             FROM `0150` f
@@ -37,7 +34,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
                 VALUES (%s, %s, %s, '', '', '', '')
             """, (cod_part, nome, cnpj))
 
-        # Busca CNPJs que ainda precisam ser atualizados
         cursor.execute("""
             SELECT cnpj FROM cadastro_fornecedores
             WHERE (cnae IS NULL OR cnae = '') AND (decreto IS NULL OR decreto = '') AND (uf IS NULL OR uf = '')
@@ -48,7 +44,6 @@ async def comparar_adicionar_atualizar_fornecedores(nome_banco):
             logging.info("Nenhum CNPJ pendente de atualização.")
             return
 
-        # Atualiza em lotes para evitar sobrecarga
         BATCH_SIZE = 100
         total_atualizados = 0
 
