@@ -6,17 +6,22 @@ from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.siglas import obter_sigla_estado
 import threading
 
-def processar_sped_thread(nome_banco, progress_bar, label_arquivo):
+def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(processar_sped(nome_banco, progress_bar, label_arquivo))
+    loop.run_until_complete(processar_sped(nome_banco, progress_bar, label_arquivo, caminhos))
     loop.close()
 
 def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo):
-    thread = threading.Thread(target=processar_sped_thread, args=(nome_banco, progress_bar, label_arquivo))
+    caminhos, _ = QFileDialog.getOpenFileNames(None, "Inserir Sped", "", "Arquivos Sped (*.txt)")
+    if not caminhos:
+        mensagem_aviso("Nenhum arquivo selecionado.")
+        return
+    thread = threading.Thread(target=processar_sped_thread, args=(nome_banco, progress_bar, label_arquivo, caminhos))
     thread.start()
 
-async def processar_sped(nome_banco, progress_bar, label_arquivo):
+
+async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos):
     import time
     inicio = time.time()
     progress_bar.setValue(0)
@@ -31,11 +36,6 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo):
         mensagem_error("Tributação não encontrada. Envie primeiramente a tributação.")
         return
     cursor.close()
-
-    caminhos, _ = QFileDialog.getOpenFileNames(None, "Inserir Sped", "", "Arquivos Sped (*.txt)")
-    if not caminhos:
-        mensagem_aviso("Nenhum arquivo selecionado.")
-        return
 
     total = len(caminhos)
     try:

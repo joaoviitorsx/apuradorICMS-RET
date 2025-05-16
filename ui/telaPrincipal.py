@@ -2,8 +2,7 @@ import asyncio
 from PySide6 import QtWidgets, QtGui, QtCore
 from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
-from services.spedService.carregamento import processar_sped
-from services.spedService import processar_sped
+from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -79,12 +78,8 @@ class MainWindow(QtWidgets.QMainWindow):
         enviar_tributacao(self.empresa_sem_espacos, self.progress_bar)
 
     def _processar_sped(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(
-            processar_sped(self.empresa_sem_espacos, self.progress_bar, self.label_arquivo)
-        )
-        loop.close()
+        self.progress_bar.setValue(0)
+        iniciar_processamento_sped(self.empresa_sem_espacos, self.progress_bar, self.label_arquivo)
 
     def _criar_seletor_mes_ano(self):
         mes_frame = QtWidgets.QHBoxLayout()
