@@ -11,7 +11,7 @@ class PopupAliquota(QtWidgets.QDialog):
         self.setGeometry(300, 150, 800, 500)
         self.setStyleSheet("background-color: #f0f0f0;")
 
-        self.dados = dados  # lista de tuplas (codigo, produto, ncm)
+        self.dados = dados
         self.nome_banco = nome_banco
 
         self.aliquotas = ["1.54%", "4.00%", "8.13%", "ST", "ISENTO"]
