@@ -12,7 +12,6 @@ COLUNAS_SINONIMAS = {
 }
 
 def mapear_colunas(df):
-    """Mapeia colunas reais do DataFrame com os nomes padrão do sistema"""
     colunas_encontradas = {}
     colunas_atuais = [col.lower().strip() for col in df.columns]
 
