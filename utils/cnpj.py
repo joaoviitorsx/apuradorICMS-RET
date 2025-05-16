@@ -34,89 +34,74 @@ lista_cnaes = [
 ]
 
 cache_resultados = {}
+semaforo = asyncio.Semaphore(10)
 
 @create_cache()
-async def buscar_informacoes(cnpj):
+async def buscar_informacoes(cnpj, tentativas=2):
     url = f'https://minhareceita.org/{cnpj}'
     timeout = aiohttp.ClientTimeout(total=10)
-    
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        try:
-            async with session.get(url) as resposta:
-                if resposta.status == 200:
-                    dados = await resposta.json()
-                    cnae_codigo = str(dados.get('cnae_fiscal', []))
-                    existe_no_lista = "Sim" if cnae_codigo in lista_cnaes else "Não"
-                    uf = dados.get('uf', '')
-                    pegar_simples = dados.get('opcao_pelo_simples', '')
-                    simples = "Sim" if pegar_simples == True else "Não"
-                    return cnae_codigo, existe_no_lista, uf, simples
-                else:
-                    print(f"Erro na requisição: Status {resposta.status}")
-                    return None, None, None, None
-        except asyncio.TimeoutError:
-            print(f"Timeout: A requisição para o CNPJ {cnpj} demorou muito e foi cancelada.")
-            return None, None, None, None
-        except Exception as e:
-            print(f"Ocorreu um erro ao buscar informações para o CNPJ {cnpj}: {e}")
-            return None, None
+
+    async with semaforo:
+        for tentativa in range(1, tentativas + 1):
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url) as resposta:
+                        if resposta.status == 200:
+                            dados = await resposta.json()
+                            cnae_codigo = str(dados.get('cnae_fiscal', []))
+                            existe_na_lista = "Sim" if cnae_codigo in lista_cnaes else "Não"
+                            uf = dados.get('uf', '')
+                            pegar_simples = dados.get('opcao_pelo_simples', '')
+                            simples = "Sim" if pegar_simples is True else "Não"
+                            return cnae_codigo, existe_na_lista, uf, simples
+                        else:
+                            print(f"[{tentativa}] Status {resposta.status} para CNPJ {cnpj}")
+            except asyncio.TimeoutError:
+                print(f"[{tentativa}] Timeout no CNPJ {cnpj}")
+            except Exception as e:
+                print(f"[{tentativa}] Erro inesperado no CNPJ {cnpj}: {e}")
+
+        # Se falhar em todas as tentativas
+        return None, None, None, None
 
 async def processar_cnpjs(cnpjs):
     resultados = {}
     tasks = []
+
     for cnpj in cnpjs:
         if cnpj in cache_resultados:
             resultados[cnpj] = cache_resultados[cnpj]
         else:
             tasks.append(_processar_cnpj(cnpj, resultados))
-    
+
     await asyncio.gather(*tasks)
     return resultados
 
 async def _processar_cnpj(cnpj, resultados):
-    cnae_codigo, existe_no_lista, uf, simples = await buscar_informacoes(cnpj)
-    resultados[cnpj] = (cnae_codigo, existe_no_lista, uf, simples)
-    cache_resultados[cnpj] = (cnae_codigo, existe_no_lista, uf, simples)
+    cnpj_limpo = remover_caracteres_nao_numericos(cnpj)
+    cnae_codigo, existe_na_lista, uf, simples = await buscar_informacoes(cnpj_limpo)
+    resultados[cnpj] = (cnae_codigo, existe_na_lista, uf, simples)
+    cache_resultados[cnpj] = (cnae_codigo, existe_na_lista, uf, simples)
 
 def validar_cnpj(cnpj):
     cnpj = ''.join(filter(str.isdigit, cnpj))
-    
-    if len(cnpj) != 14:
+
+    if len(cnpj) != 14 or cnpj == cnpj[0] * 14:
         return False
-        
-    if cnpj == cnpj[0] * 14:
-        return False
-        
-    soma = 0
-    peso = 5
-    for i in range(12):
-        soma += int(cnpj[i]) * peso
-        peso = peso - 1 if peso > 2 else 9
-    
+
+    soma = sum(int(cnpj[i]) * (5 - i if i < 4 else 13 - i) for i in range(12))
     digito1 = 11 - (soma % 11)
-    if digito1 > 9:
-        digito1 = 0
-        
+    digito1 = 0 if digito1 > 9 else digito1
+
     if int(cnpj[12]) != digito1:
         return False
-        
-    soma = 0
-    peso = 6
-    for i in range(13):
-        soma += int(cnpj[i]) * peso
-        peso = peso - 1 if peso > 2 else 9
-        
+
+    soma = sum(int(cnpj[i]) * (6 - i if i < 5 else 14 - i) for i in range(13))
     digito2 = 11 - (soma % 11)
-    if digito2 > 9:
-        digito2 = 0
-        
-    if int(cnpj[13]) != digito2:
-        return False
-        
-    return True
+    digito2 = 0 if digito2 > 9 else digito2
+
+    return int(cnpj[13]) == digito2
 
 def formatar_cnpj(cnpj):
     cnpj = ''.join(filter(str.isdigit, cnpj))
     return f"{cnpj[:2]}.{cnpj[2:5]}.{cnpj[5:8]}/{cnpj[8:12]}-{cnpj[12:]}"
-
-
