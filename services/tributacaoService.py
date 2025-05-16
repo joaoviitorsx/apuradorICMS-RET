@@ -4,6 +4,28 @@ from db.conexao import conectar_banco, fechar_banco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
 
+# Sinônimos permitidos para cada coluna necessária
+COLUNAS_SINONIMAS = {
+    'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
+    'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
+    'NCM': ['ncm', 'cod_ncm', 'ncm_code'],
+    'ALIQUOTA': ['aliquota', 'alíquota', 'aliq', 'aliq_icms']
+}
+
+def mapear_colunas(df):
+    """Mapeia colunas reais do DataFrame com os nomes padrão do sistema"""
+    colunas_encontradas = {}
+    colunas_atuais = [col.lower().strip() for col in df.columns]
+
+    for coluna_padrao, sinonimos in COLUNAS_SINONIMAS.items():
+        for nome in sinonimos:
+            if nome.lower() in colunas_atuais:
+                idx = colunas_atuais.index(nome.lower())
+                colunas_encontradas[coluna_padrao] = df.columns[idx]
+                break
+
+    return colunas_encontradas if len(colunas_encontradas) == len(COLUNAS_SINONIMAS) else None
+
 def enviar_tributacao(nome_banco, progress_bar):
     progress_bar.setValue(0)
     filename, _ = QFileDialog.getOpenFileName(None, "Enviar Tributação", "", "Arquivos Excel (*.xlsx)")
@@ -35,13 +57,14 @@ def enviar_tributacao(nome_banco, progress_bar):
 
     try:
         df = pd.read_excel(filename, dtype=str)
-        required_columns = ['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA']
+        mapeamento = mapear_colunas(df)
 
-        if not all(col in df.columns for col in required_columns):
-            mensagem_error("O arquivo Excel não contém todas as colunas necessárias.")
+        if not mapeamento:
+            mensagem_error("Não foi possível identificar as colunas necessárias na planilha.")
             return
 
         progress_bar.setValue(40)
+        df = df.rename(columns=mapeamento)
         df['ALIQUOTA'] = df['ALIQUOTA'].apply(lambda x: formatar_aliquota(str(x).strip()))
         dados_para_inserir = df[['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA']].values.tolist()
 
