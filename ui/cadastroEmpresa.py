@@ -1,6 +1,5 @@
 from PySide6 import QtWidgets, QtGui, QtCore
 from db.conexao import conectar_banco
-from ui.telaEmpresa import EmpresaWindow
 from utils.icone import usar_icone
 from utils.mensagem import mensagem_error, mensagem_sucesso
 import re
@@ -123,6 +122,7 @@ class EmpresaCadastro(QtWidgets.QWidget):
                 conexao.close()
 
     def voltar(self):
+        from ui.telaEmpresa import EmpresaWindow
         self.empresas = EmpresaWindow()
         usar_icone(self.empresas)
         self.empresas.showMaximized()
