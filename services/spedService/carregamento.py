@@ -17,6 +17,8 @@ def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo):
     thread.start()
 
 async def processar_sped(nome_banco, progress_bar, label_arquivo):
+    import time
+    inicio = time.time()
     progress_bar.setValue(0)
     conexao = conectar_banco(nome_banco)
     if not conexao:
@@ -47,6 +49,9 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo):
 
                     label_arquivo.setText(f'Processando arquivo {i+1}/{total}')
                     await salvar_no_banco(conteudo_processado, cursor, nome_banco, progress_bar)
+
+                    fim = time.time()
+                    print(f"[DEBUG] Tempo total de processamento SPED: {fim - inicio:.2f} segundos")
 
             except Exception as e:
                 mensagem_error(f"Erro ao processar o arquivo {caminho}: {e}")
