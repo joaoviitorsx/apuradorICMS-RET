@@ -4,6 +4,17 @@ from db.conexao import conectar_banco, fechar_banco
 from utils.processData import process_data
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.siglas import obter_sigla_estado
+import threading
+
+def processar_sped_thread(nome_banco, progress_bar, label_arquivo):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(processar_sped(nome_banco, progress_bar, label_arquivo))
+    loop.close()
+
+def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo):
+    thread = threading.Thread(target=processar_sped_thread, args=(nome_banco, progress_bar, label_arquivo))
+    thread.start()
 
 async def processar_sped(nome_banco, progress_bar, label_arquivo):
     progress_bar.setValue(0)
@@ -47,6 +58,7 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo):
     finally:
         cursor.close()
         fechar_banco(conexao)
+
 
 async def salvar_no_banco(conteudo, cursor, nome_banco, progress_bar):
     progress_bar.setValue(5)
