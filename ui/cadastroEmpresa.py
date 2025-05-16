@@ -1,8 +1,9 @@
-from PySide6 import QtWidgets, QtGui, QtCore
-from db.conexao import conectar_banco
-from utils.icone import usar_icone
+from PySide6 import QtWidgets, QtCore, QtGui
+from ui.telaEmpresa import EmpresaWindow
 from utils.mensagem import mensagem_error, mensagem_sucesso
+from utils.icone import usar_icone
 import re
+from db.conexao import conectar_banco, tabela_empresa
 
 class EmpresaCadastro(QtWidgets.QWidget):
     def __init__(self, banco_empresas):
@@ -13,7 +14,7 @@ class EmpresaCadastro(QtWidgets.QWidget):
 
         self.banco_empresas = banco_empresas
 
-        self.layout = QtWidgets.QVBoxLayout()
+        self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.setContentsMargins(20, 20, 20, 20)
         self.layout.setSpacing(10)
 
@@ -35,23 +36,20 @@ class EmpresaCadastro(QtWidgets.QWidget):
         self.razao_social_input.setStyleSheet("font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; color: #000000;")
 
         self.btn_cadastrar_empresa = QtWidgets.QPushButton('Cadastrar')
-        self.btn_cadastrar_empresa.setStyleSheet(self._estilo_botao())
+        self.btn_cadastrar_empresa.setStyleSheet(self._botao_estilo())
         self.btn_cadastrar_empresa.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.btn_cadastrar_empresa.clicked.connect(self.cadastrar_empresa)
 
         self.voltar_btn = QtWidgets.QPushButton('Voltar')
-        self.voltar_btn.setStyleSheet(self._estilo_botao())
+        self.voltar_btn.setStyleSheet(self._botao_estilo())
         self.voltar_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.voltar_btn.clicked.connect(self.voltar)
 
         group_box = QtWidgets.QGroupBox()
         group_box.setStyleSheet("background-color: #FFFFFF; padding: 20px; border-radius: 10px;")
         group_box.setMaximumWidth(500)
-        group_box.setMinimumWidth(500)
 
-        group_box_layout = QtWidgets.QVBoxLayout()
-        group_box_layout.setSpacing(10)
-        group_box_layout.setContentsMargins(10, 10, 10, 10)
+        group_box_layout = QtWidgets.QVBoxLayout(group_box)
         group_box_layout.addWidget(self.title_label)
         group_box_layout.addWidget(self.cnpj_label)
         group_box_layout.addWidget(self.cnpj_input)
@@ -59,71 +57,82 @@ class EmpresaCadastro(QtWidgets.QWidget):
         group_box_layout.addWidget(self.razao_social_input)
         group_box_layout.addWidget(self.btn_cadastrar_empresa)
         group_box_layout.addWidget(self.voltar_btn)
-        group_box.setLayout(group_box_layout)
 
         center_layout = QtWidgets.QVBoxLayout()
         center_layout.addStretch()
         center_layout.addWidget(group_box, alignment=QtCore.Qt.AlignCenter)
         center_layout.addStretch()
 
-        main_layout = QtWidgets.QVBoxLayout()
-        main_layout.addLayout(center_layout)
+        self.layout.addLayout(center_layout)
 
-        self.setLayout(main_layout)
-
-    def _estilo_botao(self):
-        return """QPushButton {
-            font-size: 20px;
-            font-weight: bold;
-            padding: 10px;
-            background-color: #001F3F;
-            color: #ffffff;
-        }
-        QPushButton:hover {
-            background-color: #005588;
-            color:#ffffff;
-        }"""
+    def _botao_estilo(self):
+        return """
+            QPushButton {
+                font-size: 20px;
+                font-weight: bold;
+                padding: 10px;
+                background-color: #001F3F;
+                color: #ffffff;
+            }
+            QPushButton:hover {
+                background-color: #005588;
+            }
+        """
 
     def cadastrar_empresa(self):
         cnpj = self.cnpj_input.text().strip()
         razao_social = self.razao_social_input.text().strip()
 
-        cnpj_so_numeros = re.sub(r'\D', '', cnpj)
-        razao_social_modificada = razao_social.replace(" ", "_")
+        cnpj_numeros = re.sub(r'\D', '', cnpj)
+        razao_formatada = razao_social.replace(" ", "_")
 
-        if re.match(r'^[\d_]', razao_social_modificada):
-            mensagem_error("O nome do banco de dados não pode começar com um número ou underline.")
+        if not razao_social or len(cnpj) != 18:
+            mensagem_error("Preencha todos os campos corretamente.")
             return
 
-        if not re.match(r'^[a-zA-Z0-9_]+$', razao_social_modificada):
-            mensagem_error("O nome do banco de dados só pode conter letras, números e underline.")
+        if re.match(r'^[\d_]', razao_formatada) or not re.match(r'^[a-zA-Z0-9_]+$', razao_formatada):
+            mensagem_error("Razão Social inválida para nome de banco.")
             return
 
-        if len(cnpj) != 18:
-            mensagem_error("CNPJ inválido.")
-            return
+        # Inicia o processo de cadastro em segundo plano
+        self.worker = CadastroEmpresaWorker(self.banco_empresas, cnpj_numeros, razao_social)
+        self.worker.cadastro_finalizado.connect(self.cadastro_sucesso)
+        self.worker.erro_ocorrido.connect(self.cadastro_erro)
+        self.worker.start()
 
-        if len(razao_social) < 1:
-            mensagem_error("Razão social inválida.")
-            return
+    def cadastro_sucesso(self, mensagem):
+        mensagem_sucesso(mensagem)
 
-        try:
-            conexao = conectar_banco(self.banco_empresas)
-            cursor = conexao.cursor()
-            cursor.execute(f"USE {self.banco_empresas}")
-            cursor.execute("INSERT INTO empresas (cnpj, razao_social) VALUES (%s, %s)", (cnpj_so_numeros, razao_social))
-            conexao.commit()
-            mensagem_sucesso("Empresa cadastrada com sucesso.")
-        except Exception as e:
-            mensagem_error(f"Ocorreu um erro ao cadastrar a empresa: {e}")
-        finally:
-            if conexao.is_connected():
-                cursor.close()
-                conexao.close()
+    def cadastro_erro(self, erro):
+        mensagem_error(f"Erro ao cadastrar: {erro}")
 
     def voltar(self):
-        from ui.telaEmpresa import EmpresaWindow
         self.empresas = EmpresaWindow()
         usar_icone(self.empresas)
         self.empresas.showMaximized()
         self.close()
+
+
+class CadastroEmpresaWorker(QtCore.QThread):
+    cadastro_finalizado = QtCore.Signal(str)
+    erro_ocorrido = QtCore.Signal(str)
+
+    def __init__(self, banco, cnpj, razao_social):
+        super().__init__()
+        self.banco = banco
+        self.cnpj = cnpj
+        self.razao = razao_social
+
+    def run(self):
+        try:
+            conexao = conectar_banco(self.banco)
+            tabela_empresa(conexao)
+            cursor = conexao.cursor()
+            cursor.execute(f"USE {self.banco}")
+            cursor.execute("INSERT INTO empresas (cnpj, razao_social) VALUES (%s, %s)", (self.cnpj, self.razao))
+            conexao.commit()
+            cursor.close()
+            conexao.close()
+            self.cadastro_finalizado.emit("Empresa cadastrada com sucesso.")
+        except Exception as e:
+            self.erro_ocorrido.emit(str(e))
