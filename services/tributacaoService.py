@@ -4,7 +4,6 @@ from db.conexao import conectar_banco, fechar_banco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
 
-# Sinônimos permitidos para cada coluna necessária
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
     'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
