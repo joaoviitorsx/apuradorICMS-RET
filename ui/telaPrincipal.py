@@ -5,7 +5,6 @@ from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa):
         super().__init__()
