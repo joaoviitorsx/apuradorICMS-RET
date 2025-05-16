@@ -4,6 +4,7 @@ from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
+from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa):
@@ -121,4 +122,9 @@ class MainWindow(QtWidgets.QMainWindow):
             from utils.mensagem import mensagem_aviso
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
-        exportar_resultado(self.empresa_sem_espacos, mes, ano, self.progress_bar)
+        from services.exportacaoServiceThread import ExportarTabelaThread
+
+        self.thread_exportar = ExportarTabelaThread(self.empresa_sem_espacos, mes, ano)
+        self.thread_exportar.progresso.connect(self.progress_bar.setValue)
+        self.thread_exportar.mensagem.connect(lambda msg: mensagem_sucesso(msg) if "sucesso" in msg.lower() else mensagem_aviso(msg))
+        self.thread_exportar.start()

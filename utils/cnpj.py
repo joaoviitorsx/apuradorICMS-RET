@@ -60,8 +60,6 @@ async def buscar_informacoes(cnpj, tentativas=2):
                 print(f"[{tentativa}] Timeout no CNPJ {cnpj}")
             except Exception as e:
                 print(f"[{tentativa}] Erro inesperado no CNPJ {cnpj}: {e}")
-
-        # Se falhar em todas as tentativas
         return None, None, None, None
 
 async def processar_cnpjs(cnpjs):
