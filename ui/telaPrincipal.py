@@ -4,7 +4,8 @@ from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
-from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
+from services.exportacaoServiceThread import ExportarTabelaThread
+from utils.mensagem import mensagem_error, mensagem_sucesso, mensagem_aviso
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa):
         super().__init__()
@@ -115,15 +116,33 @@ class MainWindow(QtWidgets.QMainWindow):
         mes_frame.addWidget(btn_baixar_tabela)
 
     def _baixar_tabela(self):
+        from services.exportacaoServiceThread import ExportarTabelaThread
+        from utils.mensagem import mensagem_aviso, mensagem_sucesso
+
         mes = self.mes_var.currentText()
         ano = self.ano_var.currentText()
+
         if mes == "Escolha o mês" or ano == "Escolha o ano":
-            from utils.mensagem import mensagem_aviso
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
-        from services.exportacaoServiceThread import ExportarTabelaThread
 
         self.thread_exportar = ExportarTabelaThread(self.empresa_sem_espacos, mes, ano)
         self.thread_exportar.progresso.connect(self.progress_bar.setValue)
         self.thread_exportar.mensagem.connect(lambda msg: mensagem_sucesso(msg) if "sucesso" in msg.lower() else mensagem_aviso(msg))
+        self.thread_exportar.abrir_popup.connect(self._abrir_popup_aliquota)
+
         self.thread_exportar.start()
+
+    def _abrir_popup_aliquota(self, dados):
+        from ui.popupAliquota import PopupAliquota
+        popup = PopupAliquota(dados, self.empresa_sem_espacos)
+        resultado = popup.exec()
+
+        if resultado == QtWidgets.QDialog.Accepted:
+            self._concluir_exportacao()
+
+    def _concluir_exportacao(self):
+        from services.exportacaoService import exportar_resultado
+        mes = self.mes_var.currentText()
+        ano = self.ano_var.currentText()
+        exportar_resultado(self.empresa_sem_espacos, mes, ano, self.progress_bar)

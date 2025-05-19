@@ -1,9 +1,12 @@
 import pandas as pd
-from PySide6.QtWidgets import QFileDialog
+import unicodedata
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 from db.conexao import conectar_banco, fechar_banco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
+from ui.popupAliquota import PopupAliquota
 
+# Mapeamento flexível de colunas
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
     'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
@@ -11,18 +14,28 @@ COLUNAS_SINONIMAS = {
     'ALIQUOTA': ['aliquota', 'alíquota', 'aliq', 'aliq_icms']
 }
 
+def normalizar_texto(texto):
+    return unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode().lower().replace('_', '').replace(' ', '')
+
 def mapear_colunas(df):
     colunas_encontradas = {}
     colunas_atuais = [col.lower().strip() for col in df.columns]
 
     for coluna_padrao, sinonimos in COLUNAS_SINONIMAS.items():
         for nome in sinonimos:
-            if nome.lower() in colunas_atuais:
-                idx = colunas_atuais.index(nome.lower())
-                colunas_encontradas[coluna_padrao] = df.columns[idx]
+            for col in df.columns:
+                if col.strip().lower() == nome.lower():
+                    colunas_encontradas[coluna_padrao] = col
+                    break
+            if coluna_padrao in colunas_encontradas:
                 break
 
-    return colunas_encontradas if len(colunas_encontradas) == len(COLUNAS_SINONIMAS) else None
+    colunas_necessarias = ['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA']
+    if all(col in colunas_encontradas for col in colunas_necessarias):
+        return colunas_encontradas
+
+    mensagem_error(f"Erro: Colunas esperadas não encontradas. Colunas atuais: {df.columns.tolist()}")
+    return None
 
 def enviar_tributacao(nome_banco, progress_bar):
     progress_bar.setValue(0)
@@ -61,10 +74,18 @@ def enviar_tributacao(nome_banco, progress_bar):
             mensagem_error("Não foi possível identificar as colunas necessárias na planilha.")
             return
 
-        progress_bar.setValue(40)
+        print("[DEBUG] Colunas mapeadas:", mapeamento)
+
         df = df.rename(columns=mapeamento)
-        df['ALIQUOTA'] = df['ALIQUOTA'].apply(lambda x: formatar_aliquota(str(x).strip()))
-        dados_para_inserir = df[['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA']].values.tolist()
+
+        col_aliquota = mapeamento['ALIQUOTA']
+        df[col_aliquota] = df[col_aliquota].apply(lambda x: formatar_aliquota(str(x).strip()) if pd.notna(x) else '')
+
+        colunas_para_inserir = [mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA']]
+        df_inserir = df[colunas_para_inserir].copy()
+
+        dados_para_inserir = df_inserir.values.tolist()
+
 
         cursor.executemany("""
             INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
@@ -101,3 +122,25 @@ def enviar_tributacao(nome_banco, progress_bar):
     finally:
         cursor.close()
         fechar_banco(conexao)
+
+def verificar_e_preencher_aliquotas(conexao, tela_pai=None):
+    try:
+        cursor = conexao.cursor()
+        cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+        dados = cursor.fetchall()
+        cursor.close()
+
+        if dados:
+            msg = QMessageBox(tela_pai)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Alíquotas Nulas")
+            msg.setText(f"Foram encontrados {len(dados)} produtos sem alíquota.")
+            msg.setInformativeText("Deseja preenchê-las agora?")
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            resposta = msg.exec()
+
+            if resposta == QMessageBox.Yes:
+                tela = PopupAliquota(dados, conexao)
+                tela.exec()
+    except Exception as e:
+        mensagem_error(f"Erro ao verificar alíquotas nulas: {e}")

@@ -1,13 +1,15 @@
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog,QApplication
 import pandas as pd
 from pathlib import Path
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
+from ui.popupAliquota import PopupAliquota
 
 class ExportarTabelaThread(QThread):
     progresso = Signal(int)
     mensagem = Signal(str)
+    abrir_popup = Signal(list)
 
     def __init__(self, nome_banco, mes, ano):
         super().__init__()
@@ -39,6 +41,17 @@ class ExportarTabelaThread(QThread):
 
             colunas = [desc[0] for desc in cursor.description]
             df = pd.DataFrame(rows, columns=colunas)
+
+            cursor_ver = conexao.cursor()
+            cursor_ver.execute("SELECT COUNT(*) FROM cadastro_tributacao WHERE aliquota IS NULL OR aliquota = ''")
+            qtd_nulas = cursor_ver.fetchone()[0]
+
+            if qtd_nulas > 0:
+                cursor_ver.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+                dados_nulos = cursor_ver.fetchall()
+                self.abrir_popup.emit(dados_nulos)
+                self.mensagem.emit("Preencha as alíquotas antes de exportar a planilha.")
+                return
 
             for campo in ['resultado', 'vl_item', 'aliquota']:
                 if campo in df.columns:

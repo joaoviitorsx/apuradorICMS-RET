@@ -1,61 +1,9 @@
-import re
-import traceback
 from utils.siglas import obter_sigla_estado
 from utils.mensagem import mensagem_error, mensagem_sucesso, mensagem_aviso, notificacao
+from utils.sanitizacao import sanitizar_registro, sanitizar_campo, truncar, corrigir_unidade, corrigir_ind_mov, TAMANHOS_MAXIMOS,get_column_index, get_fallback_value, get_fallback_value_by_index, calcular_periodo, corrigir_cst_icms, validar_estrutura_c170
 import time
 
-TAMANHOS_MAXIMOS = {
-    'unid': 6,
-    'cod_item': 60,
-    'descr_item': 255,
-    'descr_compl': 255,
-    'cod_nat': 10,
-    'cod_cta': 255
-}
-
 UNIDADE_PADRAO = "UN"
-
-def corrigir_unidade(valor):
-    try:
-        if valor is None:
-            return "U"  # Apenas um caractere
-
-        valor_str = str(valor).strip().upper()
-        valor_str = re.sub(r'[\x00-\x1F\x7F\r\n]', '', valor_str)
-
-        if not valor_str or any(c in valor_str for c in ',.'):
-            return "U"  # Apenas um caractere
-
-        if all(c.isdigit() for c in valor_str):
-            return "U"  # Apenas um caractere
-
-        # Retornar apenas o primeiro caractere para garantir compatibilidade
-        return valor_str[0:1]  # Apenas um caractere
-    except Exception as e:
-        print(f"[ERRO] Falha ao corrigir unidade '{valor}': {e}")
-        return "U"  # Apenas um caractere
-
-
-def truncar_dados(dados, indice, campo, tamanho_maximo):
-    if indice >= len(dados):
-        return dados
-    
-    if dados[indice] is None:
-        return dados
-        
-    if campo == 'unid':
-        valor_original = dados[indice]
-        dados[indice] = corrigir_unidade(dados[indice])
-        if valor_original != dados[indice]:
-            print(f"[DEBUG] Corrigido campo '{campo}': '{valor_original}' → '{dados[indice]}'")
-        return dados
-        
-    if isinstance(dados[indice], str) and len(dados[indice]) > tamanho_maximo:
-        valor_original = dados[indice]
-        dados[indice] = dados[indice][:tamanho_maximo]
-        print(f"[DEBUG] Truncado campo '{campo}': '{valor_original}' → '{dados[indice]}'")
-    
-    return dados
 
 def processar_registro_c170(dados, dt_ini_0000, filial, ind_oper, cod_part, num_doc, chv_nfe):
     if len(dados) > 38:
@@ -65,25 +13,27 @@ def processar_registro_c170(dados, dt_ini_0000, filial, ind_oper, cod_part, num_
     
     if len(dados) > 6:
         dados[6] = corrigir_unidade(dados[6])
+    if len(dados) > 9:
+        dados[9] = corrigir_ind_mov(dados[9])
 
-    if len(dados) > 2:
-        dados = truncar_dados(dados, 2, 'cod_item', TAMANHOS_MAXIMOS['cod_item'])
-    if len(dados) > 4:
-        dados = truncar_dados(dados, 4, 'descr_compl', TAMANHOS_MAXIMOS['descr_compl'])
-    if len(dados) > 6:
-        dados = truncar_dados(dados, 6, 'unid', TAMANHOS_MAXIMOS['unid'])
-    if len(dados) > 12:
-        dados = truncar_dados(dados, 12, 'cod_nat', TAMANHOS_MAXIMOS['cod_nat'])
-    if len(dados) > 37:
-        dados = truncar_dados(dados, 37, 'cod_cta', TAMANHOS_MAXIMOS['cod_cta'])
-    
+    dados[2] = truncar(dados[2], TAMANHOS_MAXIMOS['cod_item'])
+    dados[4] = truncar(dados[4], TAMANHOS_MAXIMOS['descr_compl'])
+    dados[6] = truncar(corrigir_unidade(dados[6]), TAMANHOS_MAXIMOS['unid'])
+    dados[12] = truncar(dados[12], TAMANHOS_MAXIMOS['cod_nat'])
+    dados[37] = truncar(dados[37], TAMANHOS_MAXIMOS['cod_cta'])
+
     if dt_ini_0000:
-        periodo = f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}'
+        periodo = calcular_periodo(dt_ini_0000)
         dados_final = [periodo] + dados + [None, filial, ind_oper, cod_part, num_doc, chv_nfe]
         return dados_final
     return None
 
 async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
+    import re
+    import traceback
+
+    registros_inseridos = 0
+
     progress_status = ["|0000|", "|0150|", "|0200|", "|C100|", "|C170|"]
     linhas = conteudo.split('\n')
     print(f"[DEBUG] Iniciando processamento de {len(linhas)} linhas para salvar no banco")
@@ -95,6 +45,8 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
     dt_ini_0000 = None
     filial = None
     ind_oper = cod_part = num_doc = chv_nfe = None
+
+    registros_processados = set()
 
     inicio_processo = time.time()
     
@@ -113,7 +65,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                 dt_ini_0000 = dados[3]
                 cnpj_0000 = dados[6]
                 filial = cnpj_0000[8:12] if cnpj_0000 else '0000'
-                periodo = f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
+                periodo = calcular_periodo(dt_ini_0000)
                 dados += [filial, periodo]
                 lote_0000.append(dados)
                 contadores["0000"] += 1
@@ -127,7 +79,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                 uf = obter_sigla_estado(cod_uf)
                 cnpj = dados[4]
                 pj_pf = "PF" if cnpj is None else "PJ"
-                periodo = f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
+                periodo = calcular_periodo(dt_ini_0000)
                 dados += [cod_uf, uf, pj_pf, periodo]
                 lote_0150.append(dados)
                 contadores["0150"] += 1
@@ -137,11 +89,11 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                 dados = [d.strip().lstrip('0') if i == 1 and d.strip() else d.strip() if d.strip() else None for i, d in enumerate(dados)]
                 dados += [None] * (13 - len(dados)) if len(dados) < 13 else []
                 
-                dados = truncar_dados(dados, 1, 'cod_item', TAMANHOS_MAXIMOS['cod_item'])
-                dados = truncar_dados(dados, 2, 'descr_item', TAMANHOS_MAXIMOS['descr_item'])
-                dados = truncar_dados(dados, 5, 'unid', TAMANHOS_MAXIMOS['unid'])
-                
-                periodo = f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
+                dados[1] = truncar(dados[1], TAMANHOS_MAXIMOS['cod_item'])
+                dados[2] = truncar(dados[2], TAMANHOS_MAXIMOS['descr_item'])
+                dados[5] = truncar(dados[5], TAMANHOS_MAXIMOS['unid'])
+
+                periodo = calcular_periodo(dt_ini_0000)
                 dados.append(periodo)
                 lote_0200.append(dados)
                 contadores["0200"] += 1
@@ -150,7 +102,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                 dados = linha.split('|')[1:-1]
                 dados = [d.strip() if d.strip() else None for d in dados]
                 dados += [None] * (29 - len(dados)) if len(dados) < 29 else []
-                periodo = f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
+                periodo = calcular_periodo(dt_ini_0000)
                 dados_final = [periodo] + dados + [filial]
                 lote_c100.append(dados_final)
                 ind_oper, cod_part, num_doc, chv_nfe = dados[1], dados[4], dados[7], dados[9]
@@ -159,12 +111,25 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
             elif linha.startswith("|C170|"):
                 dados = linha.split('|')[1:-1]
                 dados = [d.strip().lstrip('0') if i == 2 and d.strip() else d.strip() if d.strip() else None for i, d in enumerate(dados)]
-                
+
+                if len(dados) > 6:
+                    dados[6] = corrigir_unidade(dados[6])
+                if len(dados) > 9:
+                    dados[9] = corrigir_ind_mov(dados[9])
+                if len(dados) > 10:
+                    dados[10] = corrigir_cst_icms(dados[10])
+
+                if not validar_estrutura_c170(dados):
+                    print(f"[WARN] Estrutura suspeita no C170 na linha {i}: {dados}")
+
                 dados_final = processar_registro_c170(dados, dt_ini_0000, filial, ind_oper, cod_part, num_doc, chv_nfe)
                 if dados_final:
                     lote_c170.append(dados_final)
-                    contadores["C170"] += 1
-        
+                    registro_id = f"{filial}_{num_doc}_{dados[2]}" 
+                    if registro_id not in registros_processados:
+                        registros_processados.add(registro_id)
+                        contadores["C170"] += 1
+
         t_fim = time.time()
         print(f"[DEBUG] Dados extraídos em {t_fim - t_inicio:.2f} segundos")
         print(f"[DEBUG] Registros extraídos: 0000: {contadores['0000']}, 0150: {contadores['0150']}, 0200: {contadores['0200']}, C100: {contadores['C100']}, C170: {contadores['C170']}")
@@ -246,15 +211,9 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
             for i in range(0, len(lote_c170), tamanho_lote):
                 lote_atual = lote_c170[i:i+tamanho_lote]
 
-                # Antes de executar o executemany, adicione este código
-                for reg in lote_atual:
-                    # Garantir que o campo 'unid' tenha apenas um caractere
-                    if reg[6] is not None:
-                        unid_str = str(reg[6]).strip().upper()
-                        if unid_str:
-                            reg_lista = list(reg)
-                            reg_lista[6] = unid_str[0]  # Pegar apenas o primeiro caractere
-                            reg = tuple(reg_lista)
+                for idx, reg in enumerate(lote_atual):
+                    reg_lista = list(reg)
+                    lote_atual[idx] = tuple(reg_lista)
 
                 try:
                     cursor.executemany('''
@@ -269,28 +228,32 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                 %s, %s, %s, %s, %s, %s)
                     ''', lote_atual)
-                    
-                    total_processado += len(lote_atual)
-                    print(f"[DEBUG] Processados {total_processado}/{len(lote_c170)} registros C170 ({(total_processado/len(lote_c170)*100):.1f}%)")
+
+                    registros_inseridos += len(lote_atual)
+                    print(f"[DEBUG] Processados {registros_inseridos}/{len(lote_c170)} registros C170")
                     
                 except Exception as e:
                     print(f"[DEBUG] Erro no lote {i//tamanho_lote+1}: {e}")
                     for j, registro in enumerate(lote_atual):
                         try:
                             print(f"[DEBUG] Tentando inserir registro {j} individualmente. Tamanho={len(registro)}")
-                            
-                            # Sanitizar diretamente o campo 'unid' que está na posição 7
                             print(f"[DEBUG] Campo unid original: '{registro[6]}'")
                             
-                            # Forçar o campo 'unid' para ter apenas 1 caractere
                             if registro[6] is not None:
-                                unid_str = str(registro[6]).strip().upper()
-                                if not unid_str or len(unid_str) > 1:
-                                    registro_mod = list(registro)
-                                    registro_mod[6] = unid_str[0] if unid_str else "U"
-                                    registro = tuple(registro_mod)
-                                    print(f"[FORCE] unid alterada: '{unid_str}' → '{registro[6]}'")
+                                valor_original = registro[6]
+                                registro_mod = list(registro)
+                                registro_mod[6] = corrigir_unidade(valor_original)
+                                if registro_mod[9] is not None:
+                                    if registro_mod[9] and len(str(registro_mod[9])) > 3:
+                                        print(f"[WARN] ind_mov excede limite: '{registro_mod[9]}'")
+                                        registro_mod[9] = corrigir_ind_mov(registro_mod[9])
+                                registro = tuple(registro_mod)
+                                print(f"[FORCE] unid alterada: '{valor_original}' → '{registro_mod[6]}'")
                             
+                            if i*tamanho_lote+j not in registros_processados:
+                                registros_processados.add(i*tamanho_lote+j)
+                                total_processado += 1
+
                             cursor.execute('''
                                 INSERT INTO c170 (
                                     periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc,
@@ -303,27 +266,95 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                         %s, %s, %s, %s, %s, %s)
                             ''', registro)
-                            total_processado += 1
+
+                            cursor.executemany(''' ... SQL ... ''', lote_atual)
+                            registros_inseridos += len(lote_atual)
+
                         except Exception as ex:
                             print(f"[DEBUG] Erro no registro {i*tamanho_lote+j}: {ex}")
-                            if "Data too long for column 'unid'" in str(ex):
-                                print(f"[DEBUG] Problema com campo 'unid': '{registro[7]}'")
+                            
+                            erro_message = str(ex)
+                            if "Data too long for column" in erro_message:
+                                import re
+                                coluna_match = re.search(r"for column '([^']+)'", erro_message)
+                                if coluna_match:
+                                    coluna_problema = coluna_match.group(1)
+                                    valor_problema = registro[get_column_index(coluna_problema)]
+                                    print(f"[DEBUG-DETALHE] Campo '{coluna_problema}' com valor '{valor_problema}' (tipo: {type(valor_problema)}, tamanho: {len(str(valor_problema)) if valor_problema is not None else 'NULL'})")
+                                    
+                                    registro_fallback = list(registro)
+                                    registro_fallback[get_column_index(coluna_problema)] = get_fallback_value(coluna_problema)
+                                    try:
+                                        cursor.execute('''
+                                            INSERT INTO c170 (
+                                                periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc,
+                                                ind_mov, cst_icms, cfop, cod_nat, vl_bc_icms, aliq_icms, vl_icms, vl_bc_icms_st,
+                                                aliq_st, vl_icms_st, ind_apur, cst_ipi, cod_enq, vl_bc_ipi, aliq_ipi, vl_ipi,
+                                                cst_pis, vl_bc_pis, aliq_pis, quant_bc_pis, aliq_pis_reais, vl_pis, cst_cofins,
+                                                vl_bc_cofins, aliq_cofins, quant_bc_cofins, aliq_cofins_reais, vl_cofins, cod_cta,
+                                                vl_abat_nt, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe
+                                            ) VALUES (%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                                    %s, %s, %s, %s, %s, %s)
+                                        ''', tuple(registro_fallback))
+
+                                        cursor.execute(''' ... SQL ... ''', tuple(registro_fallback))
+                                        registros_inseridos += 1
+
+                                        print(f"[DEBUG] Inserido com sucesso usando valor de fallback para '{coluna_problema}'")
+                                        if i*tamanho_lote+j not in registros_processados:
+                                            registros_processados.add(i*tamanho_lote+j)
+                                            total_processado += 1
+                                    except Exception as fallback_ex:
+                                        print(f"[DEBUG] Falha mesmo com fallback: {fallback_ex}")
+                                        
+                            if "ainda falhou após sanitização" not in locals():
+                                print(f"[FALLBACK-EXTREMO] Tentando inserção com valores mínimos para registro {i*tamanho_lote+j}")
+                                registro_minimo = list(registro)
+                                
+                                for k in range(3, len(registro_minimo)):
+                                    if k in [39, 40, 41, 42, 43, 44]:
+                                        continue
+                                    registro_minimo[k] = get_fallback_value_by_index(k)
+                                
+                                try:
+                                    cursor.execute('''
+                                        INSERT INTO c170 (
+                                            periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc,
+                                            ind_mov, cst_icms, cfop, cod_nat, vl_bc_icms, aliq_icms, vl_icms, vl_bc_icms_st,
+                                            aliq_st, vl_icms_st, ind_apur, cst_ipi, cod_enq, vl_bc_ipi, aliq_ipi, vl_ipi,
+                                            cst_pis, vl_bc_pis, aliq_pis, quant_bc_pis, aliq_pis_reais, vl_pis, cst_cofins,
+                                            vl_bc_cofins, aliq_cofins, quant_bc_cofins, aliq_cofins_reais, vl_cofins, cod_cta,
+                                            vl_abat_nt, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe
+                                        ) VALUES (%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                                %s, %s, %s, %s, %s, %s)
+                                    ''', tuple(registro_minimo))
+                                    cursor.execute(''' ... SQL ... ''', tuple(registro_minimo))
+                                    registros_inseridos += 1
+
+                                    print(f"[DEBUG] Inserido com fallback extremo!")
+                                    if i*tamanho_lote+j not in registros_processados:
+                                        registros_processados.add(i*tamanho_lote+j)
+                                        total_processado += 1
+                                except Exception as ultra_ex:
+                                    print(f"[DEBUG] Falha mesmo com fallback extremo: {ultra_ex}")
                 
-            print(f"[DEBUG] {total_processado} de {len(lote_c170)} registros |C170| salvos com sucesso.")
-            
+            print(f"[DEBUG] {registros_inseridos} de {len(lote_c170)} registros |C170| salvos com sucesso.")
+
         except Exception as e:
             print(f"[DEBUG] ERRO ao inserir registros C170: {e}")
             mensagem_error(f"Erro ao salvar itens de notas fiscais: {e}")
             print(traceback.format_exc())
 
         print(f"[DEBUG] Registros |C170| processados em {time.time() - t_inicio:.2f} segundos")
-
+        
         tempo_total = time.time() - inicio_processo
         print(f"[DEBUG] Todos os registros foram salvos no banco em {tempo_total:.2f} segundos")
 
         print(f"[DEBUG FINAL] Resumo do arquivo:")
         print(f" - Produtos únicos processados (|0200|): {len(lote_0200)}")
-        print(f" - Itens de nota (|C170|): {len(lote_c170)} total, {total_processado} salvos")
+        print(f" - Itens de nota (|C170|): {len(lote_c170)} total, {registros_inseridos} salvos")
         print(f" - Registros de documentos fiscais (|C100|): {len(lote_c100)}")
         print(f" - Participantes (|0150|): {len(lote_0150)}")
         print(f" - Informações iniciais (|0000|): {len(lote_0000)}")
@@ -340,3 +371,4 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
         print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         mensagem_error(f"Erro ao salvar dados em lote: {e}")
         return False
+

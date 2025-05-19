@@ -1,9 +1,10 @@
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QApplication
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
+from ui.popupAliquota import PopupAliquota
 
 def exportar_resultado(nome_banco, mes, ano, progress_bar):
     progress_bar.setValue(0)
@@ -23,6 +24,15 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
             WHERE c.periodo = '{periodo}'
         """
         df = pd.read_sql_query(query_dados, conexao)
+
+        cursor = conexao.cursor()
+        cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+        dados = cursor.fetchall()
+        cursor.close()
+
+        if dados:
+            popup = PopupAliquota(dados, nome_banco)
+            popup.exec()
 
         if df.empty:
             mensagem_aviso("Não existem dados para o mês e ano selecionados.")
