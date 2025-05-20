@@ -1,7 +1,7 @@
 import re
 
 TAMANHOS_MAXIMOS = {
-    'unid': 10,
+    'unid': 2,
     'cod_item': 60,
     'descr_item': 255,
     'descr_compl': 255,
@@ -20,84 +20,41 @@ def truncar(valor, limite):
     return valor_str[:limite]
 
 def corrigir_unidade(valor):
-    if isinstance(valor, str) and (
-        re.match(r'^\d+[,\.]\d+$', valor) or re.match(r'^\d+$', valor)):
-        print(f"[AJUSTE] Campo de unidade numérico: '{valor}' → 'UN'")
+    if not valor:
         return 'UN'
-    return valor
+        
+    valor_str = str(valor)
+    
+    if re.match(r'^\d+[,\.]\d+$', valor_str) or re.match(r'^\d+$', valor_str):
+        print(f"[AJUSTE] Campo de unidade numérico: '{valor_str}' → 'UN'")
+        return 'UN'
+    
+    match = re.match(r'^([A-Za-z]+)(\d+)', valor_str)
+    if match:
+        unidade_base = match.group(1)
+        print(f"[AJUSTE] Unidade com número: '{valor_str}' → '{unidade_base}'")
+        return unidade_base
+    
+    tamanho_banco = 3
+    if len(valor_str) > tamanho_banco:
+        print(f"[TRUNCAR] Unidade: '{valor_str}' → '{valor_str[:tamanho_banco]}'")
+        return valor_str[:tamanho_banco]
+    
+    return valor_str
 
 def corrigir_cst_icms(valor):
     if not valor:
         return "00"
-    
-    valor_str = str(valor).strip()
-    
-    if '.' in valor_str or ',' in valor_str:
-        if valor_str.replace('.', '').replace(',', '').isdigit():
-            if float(valor_str.replace(',', '.')) == 0:
-                return "00"
-            return valor_str[:2]
-    
-    if valor_str.isdigit():
-        if len(valor_str) <= 2:
-            return valor_str.zfill(2)
-        return valor_str[:2]
-    
-    return valor_str[:2]
 
-def corrigir_ind_mov(valor):
-    if valor is None:
-        return valor
-        
-    if isinstance(valor, str):
-        valor_ajustado = valor.replace(',', '.')
-        
+    valor_str = str(valor).strip().replace(',', '.')
+
+    if valor_str.replace('.', '').isdigit():
         try:
-            num = float(valor_ajustado)
-            
-            resultado = f"{num:.2f}"
-            
-            if len(resultado) > 5:
-                resultado = resultado[:5]
-                if resultado[-1] not in '0123456789':
-                    resultado = resultado[:-1]
-                    
-            print(f"[AJUSTE] ind_mov: '{valor}' → '{resultado}'")
-            return resultado
-            
+            return str(int(float(valor_str))).zfill(2)[:2]
         except ValueError:
-            if len(valor) > 5:
-                print(f"[TRUNCAR] ind_mov não numérico: '{valor}' → '{valor[:5]}'")
-                return valor[:5]
-    return valor
+            return "00"
 
-def validar_estrutura_c170(dados):
-    if len(dados) < 11:
-        return False
-    
-    try:
-        cst = dados[10]
-        return cst is not None and len(str(cst)) <= 2 and str(cst).isdigit()
-    except Exception:
-        return False
-
-def corrigir_cst_icms(valor):
-    if not valor:
-        return "00"
-    
-    valor_str = str(valor).strip()
-    
-    if '.' in valor_str:
-        if valor_str.replace('.', '').isdigit():
-            return valor_str[:5]
-    
-    if valor_str.isdigit():
-        if len(valor_str) <= 2:
-            return valor_str.zfill(2) 
-        return valor_str[:5]
-    
-    return valor_str[:5]
-
+    return valor_str[:2]
 
 def corrigir_cfop(valor):
     if valor is None:
@@ -108,6 +65,45 @@ def corrigir_cfop(valor):
     if len(valor) < 4:
         valor = valor.zfill(4)
     return valor
+
+def corrigir_ind_mov(valor):
+    if not valor:
+        return '0'
+    
+    valor_str = str(valor)
+    if len(valor_str) > 1:
+        print(f"[TRUNCAR] ind_mov: '{valor_str}' → '{valor_str[:1]}'")
+        return valor_str[:1]
+    
+    return valor_str
+
+def validar_estrutura_c170(dados):
+    try:
+        if not dados or len(dados) < 45:
+            print(f"[DEBUG] C170 com estrutura insuficiente: {len(dados) if dados else 0} campos (esperado: 45 campos)")
+            return False
+        
+        periodo = dados[0]    
+        filial = dados[41]    
+        num_doc = dados[43]   
+
+        if not periodo:
+            print("[DEBUG CRÍTICO] Periodo faltando.")
+        if not filial:
+            print("[DEBUG CRÍTICO] Filial faltando.")
+        if not num_doc:
+            print("[DEBUG CRÍTICO] Num_doc faltando.")
+
+        if not (periodo and filial and num_doc):
+            print(f"[DEBUG] C170 sem campos obrigatórios: periodo={periodo}, filial={filial}, num_doc={num_doc}")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        print(f"[ERRO] Falha ao validar C170: {e}")
+        return False
+
 
 def sanitizar_campo(campo, valor):
     regras = {
@@ -125,18 +121,25 @@ def sanitizar_campo(campo, valor):
         'cod_nat': lambda v: truncar(v, 10),
         'cod_cta': lambda v: truncar(v, 255),
         'reg': lambda v: truncar(v, 4),
-        'vl_item': lambda v: v if isinstance(v, (int, float, type(None))) else str(v).replace(',', '.'),
-        'vl_desc': lambda v: v if isinstance(v, (int, float, type(None))) else v.replace(',', '.'),
-        'vl_merc': lambda v: v if isinstance(v, (int, float, type(None))) else v.replace(',', '.'),
-        'aliq_icms': lambda v: v if isinstance(v, (int, float, type(None))) else v.replace(',', '.'),
-        'aliq_ipi': lambda v: v if isinstance(v, (int, float, type(None))) else v.replace(',', '.'),
-        'aliq_pis': lambda v: v if isinstance(v, (int, float, type(None))) else v.replace(',', '.'),
-        'aliq_cofins': lambda v: v if isinstance(v, (int, float, type(None))) else v.replace(',', '.'),
+        'vl_item': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
+        'vl_desc': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
+        'vl_merc': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
+        'aliq_icms': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
+        'aliq_ipi': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
+        'aliq_pis': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
+        'aliq_cofins': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
     }
 
-    if campo in regras:
-        return regras[campo](valor)
-    return valor
+    try:
+        if campo in regras:
+            novo_valor = regras[campo](valor)
+            if novo_valor != valor:
+                print(f"[SANITIZAR] {campo}: '{valor}' → '{novo_valor}'")
+            return novo_valor
+        return valor
+    except Exception as e:
+        print(f"[ERRO] sanitizar_campo({campo}) → {e}")
+        return valor
 
 def sanitizar_registro(registro_dict):
     return {campo: sanitizar_campo(campo, valor) for campo, valor in registro_dict.items()}
@@ -156,23 +159,31 @@ def get_column_index(column_name):
         'cst_icms': 10,
         'cfop': 11,
         'cod_nat': 12,
+        'vl_bc_icms': 13,
         'aliq_icms': 14,
+        'vl_icms': 15,
         'cod_cta': 37,
+        'id_c100': 40,
         'filial': 41,
+        'ind_oper': 42,
         'cod_part': 43,
-        # outros se necessário
+        'num_doc': 44,
+        'chv_nfe': 45,
     }
+    if column_name not in indices:
+        print(f"[AVISO] get_column_index: coluna '{column_name}' não mapeada.")
     return indices.get(column_name, -1)
-
 
 def get_fallback_value(column_name):
     fallbacks = {
-        'unid': 'U',
+        'unid': 'UN',
         'ind_mov': '0',
-        'cod_item': '0',
+        'cod_item': '0000',
         'descr_compl': '-',
-        'cod_nat': '0',
+        'cod_nat': '000',
         'cod_cta': '-',
+        'cfop': '5102',
+        'cst_icms': '00',
     }
     return fallbacks.get(column_name, None)
 
@@ -182,13 +193,13 @@ def get_fallback_value_by_index(index):
         4: 'descr_compl',
         6: 'unid',
         9: 'ind_mov',
+        10: 'cst_icms',
+        11: 'cfop',
         12: 'cod_nat',
         37: 'cod_cta',
     }
     column_name = index_to_column.get(index)
-    if column_name:
-        return get_fallback_value(column_name)
-    return None
+    return get_fallback_value(column_name) if column_name else None
 
 def calcular_periodo(dt_ini_0000):
     return f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'

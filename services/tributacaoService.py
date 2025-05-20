@@ -6,7 +6,6 @@ from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
 from ui.popupAliquota import PopupAliquota
 
-# Mapeamento flexível de colunas
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
     'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
