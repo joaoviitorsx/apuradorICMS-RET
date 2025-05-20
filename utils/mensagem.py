@@ -106,3 +106,6 @@ def mensagem_error(msg, parent=None):
 
 def mensagem_aviso(msg, parent=None):
     PopupMensagem.aviso(msg, parent)
+
+def mensagem_segura(func, texto, parent=None):
+    QTimer.singleShot(0, lambda: func(texto, parent=parent))
