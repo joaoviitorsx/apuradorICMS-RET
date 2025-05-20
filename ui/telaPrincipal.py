@@ -5,7 +5,7 @@ from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
 from services.exportacaoServiceThread import ExportarTabelaThread
-from utils.mensagem import mensagem_error, mensagem_sucesso, mensagem_aviso
+from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa):
         super().__init__()
@@ -80,7 +80,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _processar_sped(self):
         self.progress_bar.setValue(0)
-        iniciar_processamento_sped(self.empresa_sem_espacos, self.progress_bar, self.label_arquivo)
+        iniciar_processamento_sped(self.empresa_sem_espacos, self.progress_bar, self.label_arquivo, self)
 
     def _criar_seletor_mes_ano(self):
         mes_frame = QtWidgets.QHBoxLayout()
@@ -123,7 +123,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ano = self.ano_var.currentText()
 
         if mes == "Escolha o mês" or ano == "Escolha o ano":
-            mensagem_aviso("Selecione um mês e um ano válidos.")
+            mensagem_aviso("Selecione um mês e um ano válidos.", parent=self)
             return
 
         self.thread_exportar = ExportarTabelaThread(self.empresa_sem_espacos, mes, ano)

@@ -1,7 +1,7 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 from ui.cadastroEmpresa import EmpresaCadastro
 from ui.telaPrincipal import MainWindow
-from utils.mensagem import mensagem_aviso
+from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from utils.icone import usar_icone
 from db.conexao import conectar_banco, tabela_empresa
 
@@ -75,7 +75,7 @@ class EmpresaWindow(QtWidgets.QWidget):
     def entrar(self):
         empresa = self.combo_empresas.currentText()
         if empresa == "Selecione uma empresa" or not empresa:
-            mensagem_aviso("Selecione uma empresa.")
+            mensagem_aviso("Selecione uma empresa.", parent=self)
             return
         self.janela_principal = MainWindow(empresa)
         usar_icone(self.janela_principal)

@@ -1,109 +1,108 @@
-from PySide6 import QtWidgets, QtGui, QtCore
-import sys
-import traceback
+from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout, QFrame, QApplication
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont, QScreen
+import winsound
+class PopupMensagem(QDialog):
+    def __init__(self, titulo, mensagem, cor_fundo="#1e1e2f", parent=None, duracao=0):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setModal(True)
 
-_app_instance = None
+        layout_externo = QVBoxLayout(self)
+        layout_externo.setContentsMargins(0, 0, 0, 0)
+        layout_externo.setAlignment(Qt.AlignCenter)
 
-def set_app_instance(app):
-    global _app_instance
-    _app_instance = app
-
-def mensagem_error(texto):
-    print(f"[ERROR] {texto}")
-    _exibir_na_thread_principal("Erro", texto, QtWidgets.QMessageBox.Critical)
-
-def mensagem_sucesso(texto):
-    print(f"[SUCESSO] {texto}")
-    _exibir_na_thread_principal("Sucesso", texto, QtWidgets.QMessageBox.Information)
-
-def mensagem_aviso(texto):
-    print(f"[AVISO] {texto}")
-    _exibir_na_thread_principal("Aviso", texto, QtWidgets.QMessageBox.Warning)
-
-def _exibir_na_thread_principal(titulo, texto, icone):
-    try:
-        if QtCore.QThread.currentThread() == QtWidgets.QApplication.instance().thread():
-            _mostrar_mensagem(titulo, texto, icone)
-        else:
-            app = QtWidgets.QApplication.instance()
-            if app:
-                QtCore.QTimer.singleShot(0, lambda: _mostrar_mensagem_segura(titulo, texto, icone))
-            else:
-                print(f"[ERRO] Não foi possível obter a instância do QApplication")
-    except Exception as e:
-        print(f"[ERRO CRÍTICO] Falha ao agendar mensagem: {e}")
-        print(f"Mensagem que seria exibida: [{titulo}] {texto}")
-        print(traceback.format_exc())
-        
-        try:
-            app = QtWidgets.QApplication.instance()
-            if app:
-                QtCore.QTimer.singleShot(100, lambda: _mostrar_mensagem_segura(titulo, texto, icone))
-        except Exception as e2:
-            print(f"[ERRO FATAL] Segunda falha ao agendar mensagem: {e2}")
-            print(traceback.format_exc())
-
-def _mostrar_mensagem_segura(titulo, texto, icone):
-    try:
-        _mostrar_mensagem(titulo, texto, icone)
-    except Exception as e:
-        print(f"[ERRO FATAL] Impossível exibir mensagem: {e}")
-        print(traceback.format_exc())
-
-def _mostrar_mensagem(titulo, texto, icone):
-    try:
-        msg = QtWidgets.QMessageBox()
-        msg.setIcon(icone)
-        msg.setWindowTitle(titulo)
-        msg.setText(texto)
-        msg.setStyleSheet("background-color: #001F3F; color: #ffffff; font-size: 16px; font-weight: bold;")
-        msg.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        msg.setWindowFlags(msg.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
-        
-        msg.exec()
-    except Exception as e:
-        print(f"[ERRO UI] Falha ao mostrar caixa de diálogo: {e}")
-        print(traceback.format_exc())
-
-def notificacao(texto, duracao=3000):
-    print(f"[NOTIFICAÇÃO] {texto}")
-    try:
-        app = QtWidgets.QApplication.instance()
-        if app:
-            QtCore.QTimer.singleShot(0, lambda: _exibir_notificacao(texto, duracao))
-        else:
-            print(f"[ERRO] Não foi possível obter a instância do QApplication para notificação")
-    except Exception as e:
-        print(f"[ERRO NOTIFICAÇÃO] Falha ao mostrar notificação: {e}")
-        print(traceback.format_exc())
-
-def _exibir_notificacao(texto, duracao):
-    try:
-        notif = QtWidgets.QLabel(texto)
-        notif.setStyleSheet("""
-            background-color: rgba(0, 31, 63, 0.9); 
-            color: white; 
-            font-size: 14px; 
-            font-weight: bold;
-            padding: 10px;
-            border-radius: 5px;
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {cor_fundo};
+                border-radius: 12px;
+                min-width: 400px;
+                max-width: 600px;
+                padding: 30px;
+            }}
         """)
-        notif.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
-        notif.setAlignment(QtCore.Qt.AlignCenter)
+        layout_card = QVBoxLayout(card)
+        layout_card.setSpacing(20)
+        layout_card.setAlignment(Qt.AlignCenter)
 
-        if _app_instance:
-            main_window = None
-            for widget in _app_instance.topLevelWidgets():
-                if isinstance(widget, QtWidgets.QMainWindow):
-                    main_window = widget
-                    break
-            if main_window:
-                geom = main_window.geometry()
-                notif.resize(300, 80)
-                notif.move(geom.x() + geom.width() - 320, geom.y() + geom.height() - 100)
+        label_titulo = QLabel(titulo)
+        label_titulo.setObjectName("titulo")
+        label_titulo.setAlignment(Qt.AlignCenter)
+        label_titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffc107;")
 
-        notif.show()
-        QtCore.QTimer.singleShot(duracao, notif.deleteLater)
-    except Exception as e:
-        print(f"[ERRO NOTIFICAÇÃO] Falha ao exibir notificação: {e}")
-        print(traceback.format_exc())
+        label_msg = QLabel(mensagem)
+        label_msg.setObjectName("mensagem")
+        label_msg.setAlignment(Qt.AlignCenter)
+        label_msg.setWordWrap(True)
+        label_msg.setStyleSheet("font-size: 15px; color: #ffffff;")
+
+        botao = QPushButton("OK")
+        botao.setStyleSheet("""
+            QPushButton {
+                background-color: #0056b3;
+                color: white;
+                border-radius: 6px;
+                font-weight: bold;
+                padding: 12px 22px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #006fe6;
+            }
+        """)
+        botao.clicked.connect(self.accept)
+        botao.setCursor(Qt.PointingHandCursor)
+
+        layout_card.addWidget(label_titulo)
+        layout_card.addWidget(label_msg)
+        layout_card.addWidget(botao, alignment=Qt.AlignCenter)
+
+        layout_externo.addStretch()
+        layout_externo.addWidget(card, alignment=Qt.AlignCenter)
+        layout_externo.addStretch()
+
+        self.resize(600, 300)
+        self.centralizar()
+
+        if duracao > 0:
+            QTimer.singleShot(duracao, self.close)
+
+    def centralizar(self):
+        if self.parent() and isinstance(self.parent(), QFrame):
+            parent_geom = self.parent().frameGeometry()
+            x = parent_geom.x() + (parent_geom.width() - self.width()) // 2
+            y = parent_geom.y() + (parent_geom.height() - self.height()) // 2
+            self.move(x, y)
+        else:
+            screen = QApplication.primaryScreen()
+            screen_rect = screen.availableGeometry()
+            self.move(
+                screen_rect.center().x() - self.width() // 2,
+                screen_rect.center().y() - self.height() // 2
+            )
+
+    @staticmethod
+    def sucesso(mensagem, parent=None):
+        PopupMensagem("✅ Sucesso", mensagem, "#1e1e2f", parent).exec_()
+    
+    @staticmethod
+    def erro(mensagem, parent=None):
+        winsound.MessageBeep(winsound.MB_ICONHAND)
+        PopupMensagem("❌ Erro", mensagem, "#3c1e1e", parent).exec_()
+    
+    @staticmethod
+    def aviso(mensagem, parent=None):
+        winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+        PopupMensagem("⚠️ Aviso", mensagem, "#3c341e", parent).exec_()
+
+
+def mensagem_sucesso(msg, parent=None):
+    PopupMensagem.sucesso(msg, parent)
+
+def mensagem_error(msg, parent=None):
+    PopupMensagem.erro(msg, parent)
+
+def mensagem_aviso(msg, parent=None):
+    PopupMensagem.aviso(msg, parent)

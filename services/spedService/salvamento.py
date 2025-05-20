@@ -1,16 +1,12 @@
 import time
 import traceback
 from utils.siglas import obter_sigla_estado
-from utils.mensagem import mensagem_error, mensagem_sucesso, mensagem_aviso
-from utils.sanitizacao import (
-    truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,
-    TAMANHOS_MAXIMOS, get_column_index, get_fallback_value, get_fallback_value_by_index,
-    calcular_periodo, validar_estrutura_c170
-)
-
+from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
+from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,TAMANHOS_MAXIMOS, get_column_index, get_fallback_value, get_fallback_value_by_index,calcular_periodo, validar_estrutura_c170
+    
 UNIDADE_PADRAO = "UN"
 
-async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
+async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
     linhas = conteudo.split('\n')
     print(f"[DEBUG] Iniciando processamento de {len(linhas)} linhas")
 
@@ -237,12 +233,13 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco):
                 print(f"[ERRO] Lote C170 {i}-{i+len(lote_ajustado)}: {e}")
 
         print(f"[FINAL] Processamento concluído: {contadores}")
-        mensagem_sucesso(f"Processado com sucesso. {contadores['salvos']} itens salvos, {contadores['erros']} com erro.")
+        mensagem_sucesso(f"Processado com sucesso. {contadores['salvos']} itens salvos, {contadores['erros']} com erro.", parent=janela)
+
 
     except Exception as e:
         print("[FATAL] Erro durante o salvamento:", e)
         print(traceback.format_exc())
-        mensagem_error(f"Erro geral ao salvar: {e}")
+        mensagem_error(f"Erro geral ao salvar: {e}", parent=janela)
         return False
 
     return True
