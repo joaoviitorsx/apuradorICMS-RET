@@ -105,16 +105,16 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
             cursor.close()
             fechar_banco(conexao)
 
+            progresso_atual = min(indice * progresso_por_arquivo, 100)
+            progress_bar.setValue(progresso_atual)
+            
             if mensagem.lower().startswith("falha") or mensagem.lower().startswith("erro"):
                 QTimer.singleShot(0, lambda: mensagem_error(mensagem, parent=janela))
                 return False
             else:
                 QTimer.singleShot(0, lambda: mensagem_sucesso(mensagem, parent=janela))
                 return True
-
-            progresso_atual = min(indice * progresso_por_arquivo, 100)
-            progress_bar.setValue(progresso_atual)
-
+            
         except Exception as e:
             import traceback
             print(traceback.format_exc())
