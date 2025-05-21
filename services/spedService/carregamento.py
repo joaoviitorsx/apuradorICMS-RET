@@ -3,7 +3,7 @@ import threading
 import os
 import math
 from PySide6.QtWidgets import QFileDialog
-from PySide6.QtCore import QMetaObject, Qt, QTimer
+from PySide6.QtCore import QTimer
 
 from db.conexao import conectar_banco, fechar_banco
 from utils.processData import process_data
@@ -17,8 +17,11 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(processar_sped(nome_banco, progress_bar, label_arquivo, caminhos, janela))
-    if result:
-        QTimer.singleShot(0, lambda: mensagem_sucesso("Todos os SPEDs foram processados com sucesso", parent=janela))
+    if janela:
+        if result:
+            QTimer.singleShot(0, lambda: mensagem_sucesso("Todos os SPEDs foram processados com sucesso", parent=janela))
+        else:
+            QTimer.singleShot(0, lambda: mensagem_aviso("Alguns arquivos SPED apresentaram falhas no processamento.", parent=janela))
     print(f"[DEBUG] Thread de processamento SPED finalizada")
     loop.close()
 
@@ -66,8 +69,9 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos, jane
                     caminho, nome_banco, progress_bar, label_arquivo, i + 1, total, progresso_por_arquivo, janela
                 )
             )
-        await asyncio.gather(*tasks)
-        return True
+        resultados = await asyncio.gather(*tasks)
+        sucesso_total = all(resultados)
+        return sucesso_total
 
     except Exception as e:
         import traceback
@@ -96,16 +100,17 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
             conexao = conectar_banco(nome_banco)
             cursor = conexao.cursor()
 
-            sucesso = await salvar_no_banco_em_lote(conteudo_processado, cursor, nome_banco)
+            mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, nome_banco)
             conexao.commit()
             cursor.close()
             fechar_banco(conexao)
-                
-            if sucesso:
-                QTimer.singleShot(0, lambda: mensagem_sucesso(f"Arquivo {nome_arquivo} processado com sucesso.", parent=janela))
-            else:
-                QTimer.singleShot(0,lambda: mensagem_error(f"Falha ao salvar dados do arquivo {nome_arquivo}.", parent=janela))
 
+            if mensagem.lower().startswith("falha") or mensagem.lower().startswith("erro"):
+                QTimer.singleShot(0, lambda: mensagem_error(mensagem, parent=janela))
+                return False
+            else:
+                QTimer.singleShot(0, lambda: mensagem_sucesso(mensagem, parent=janela))
+                return True
 
             progresso_atual = min(indice * progresso_por_arquivo, 100)
             progress_bar.setValue(progresso_atual)
@@ -113,5 +118,5 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
         except Exception as e:
             import traceback
             print(traceback.format_exc())
-            QTimer.singleShot(0,lambda: mensagem_error(f"Erro ao processar o arquivo {nome_arquivo}: {e}", parent=janela))
-
+            QTimer.singleShot(0, lambda: mensagem_error(f"Erro ao processar o arquivo {nome_arquivo}: {e}", parent=janela))
+            return False
