@@ -77,7 +77,7 @@ class EmpresaCadastro(QtWidgets.QWidget):
                 background-color: #005588;
             }
         """
-
+    
     def cadastrar_empresa(self):
         cnpj = self.cnpj_input.text().strip()
         razao_social = self.razao_social_input.text().strip()
@@ -92,8 +92,7 @@ class EmpresaCadastro(QtWidgets.QWidget):
         if re.match(r'^[\d_]', razao_formatada) or not re.match(r'^[a-zA-Z0-9_]+$', razao_formatada):
             mensagem_error("Razão Social inválida para nome de banco.")
             return
-
-        # Inicia o processo de cadastro em segundo plano
+        
         self.worker = CadastroEmpresaWorker(self.banco_empresas, cnpj_numeros, razao_social)
         self.worker.cadastro_finalizado.connect(self.cadastro_sucesso)
         self.worker.erro_ocorrido.connect(self.cadastro_erro)

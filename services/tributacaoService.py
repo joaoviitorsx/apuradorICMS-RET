@@ -85,7 +85,6 @@ def enviar_tributacao(nome_banco, progress_bar):
 
         dados_para_inserir = df_inserir.values.tolist()
 
-
         cursor.executemany("""
             INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
             VALUES (%s, %s, %s, %s)

@@ -5,7 +5,6 @@ HOST = 'localhost'
 USUARIO = 'root'
 SENHA = '1234'
 
-
 def conectar_banco(nome_banco):
     try:
         conexao = mysql.connector.connect(
@@ -20,11 +19,9 @@ def conectar_banco(nome_banco):
         print(f"Erro ao conectar ao banco de dados: {e}")
         return None
 
-
 def fechar_banco(conexao):
     if conexao and conexao.is_connected():
         conexao.close()
-
 
 def tabela_empresa(conexao):
     try:
