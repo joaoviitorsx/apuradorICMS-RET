@@ -52,7 +52,7 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
             if conexao:
                 print("[DEBUG] Conexão com o banco estabelecida")
                 cursor = conexao.cursor()
-                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+                cursor.execute("SELECT codigo, produto, ncm, aliquota FROM cadastro_tributacao WHERE aliquota IS NULL")
                 print("[DEBUG] Executando consulta para produtos com alíquotas nulas")
                 produtos_nulos = cursor.fetchall()
                 if produtos_nulos:
@@ -65,6 +65,7 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
                     mensageiro.sinal_sucesso.emit("Nenhum produto com alíquotas nulas encontrado.")
 
                 print(f"[DEBUG] Encontrados {len(produtos_nulos)} produtos com alíquotas nulas")
+                print("[DEBUG] Fechando conexão com o banco")
                 cursor.close()
                 fechar_banco(conexao)
 
