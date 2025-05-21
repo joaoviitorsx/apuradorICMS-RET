@@ -3,8 +3,8 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtWidgets import QMessageBox
 import os
 
-def mensagem_error(mensagem):
-    msg_erro = QtWidgets.QMessageBox()
+def mensagem_error(mensagem, parent=None):
+    msg_erro = QtWidgets.QMessageBox(parent)
     msg_erro.setIcon(QtWidgets.QMessageBox.Critical)
     msg_erro.setWindowTitle("Erro")
     msg_erro.setText(mensagem)
@@ -13,8 +13,8 @@ def mensagem_error(mensagem):
     msg_erro.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))    
     msg_erro.exec()
 
-def mensagem_sucesso(mensagem):
-    msg_sucesso = QtWidgets.QMessageBox()
+def mensagem_sucesso(mensagem, parent=None):
+    msg_sucesso = QtWidgets.QMessageBox(parent)
     msg_sucesso.setIcon(QtWidgets.QMessageBox.Information)
     msg_sucesso.setWindowTitle("Sucesso")
     msg_sucesso.setText(mensagem)
@@ -23,8 +23,8 @@ def mensagem_sucesso(mensagem):
     msg_sucesso.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))    
     msg_sucesso.exec()
 
-def mensagem_aviso(mensagem):
-    msg_aviso = QtWidgets.QMessageBox()
+def mensagem_aviso(mensagem, parent=None):
+    msg_aviso = QtWidgets.QMessageBox(parent)
     msg_aviso.setIcon(QtWidgets.QMessageBox.Warning)
     msg_aviso.setWindowTitle("Aviso")
     msg_aviso.setText(mensagem)

@@ -123,7 +123,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ano = self.ano_var.currentText()
 
         if mes == "Escolha o mês" or ano == "Escolha o ano":
-            mensagem_aviso("Selecione um mês e um ano válidos.", parent=self)
+            mensagem_aviso("Selecione um mês e um ano válidos.")
             return
 
         self.thread_exportar = ExportarTabelaThread(self.empresa_sem_espacos, mes, ano)

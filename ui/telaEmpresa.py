@@ -51,7 +51,6 @@ class EmpresaWindow(QtWidgets.QWidget):
 
         self.layout.addStretch()
 
-        # Thread para carregar empresas
         self.loader_thread = EmpresaLoader(self.banco_empresas)
         self.loader_thread.empresas_carregadas.connect(self.preencher_empresas)
         self.loader_thread.erro_ocorrido.connect(self.exibir_erro_empresas)
@@ -75,7 +74,7 @@ class EmpresaWindow(QtWidgets.QWidget):
     def entrar(self):
         empresa = self.combo_empresas.currentText()
         if empresa == "Selecione uma empresa" or not empresa:
-            mensagem_aviso("Selecione uma empresa.", parent=self)
+            mensagem_aviso("Selecione uma empresa.")
             return
         self.janela_principal = MainWindow(empresa)
         usar_icone(self.janela_principal)

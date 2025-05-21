@@ -232,7 +232,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
             except Exception as e:
                 contadores["erros"] += len(lote_ajustado)
                 print(f"[ERRO] Lote C170 {i}-{i+len(lote_ajustado)}: {e}")
-                
+
         print(f"[FINAL] Processamento concluído: {contadores}")
         return f"Processado com sucesso. {contadores['salvos']} itens salvos, {contadores['erros']} com erro."
 

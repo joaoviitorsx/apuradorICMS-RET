@@ -3,7 +3,7 @@ import threading
 import os
 import math
 from PySide6.QtWidgets import QFileDialog
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QObject, Signal
 
 from db.conexao import conectar_banco, fechar_banco
 from utils.processData import process_data
@@ -12,18 +12,32 @@ from .salvamento import salvar_no_banco_em_lote
 
 sem_limite = asyncio.Semaphore(3)
 
-def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, janela=None):
+class Mensageiro(QObject):
+    sinal_sucesso = Signal(str)
+    sinal_erro = Signal(str)
+
+def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
     print(f"[DEBUG] Iniciando thread de processamento SPED com {len(caminhos)} arquivo(s)")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(processar_sped(nome_banco, progress_bar, label_arquivo, caminhos, janela))
-    if janela:
-        if result:
-            QTimer.singleShot(0, lambda: mensagem_sucesso("Todos os SPEDs foram processados com sucesso", parent=janela))
-        else:
-            QTimer.singleShot(0, lambda: mensagem_aviso("Alguns arquivos SPED apresentaram falhas no processamento.", parent=janela))
+
+    result, mensagem_final = loop.run_until_complete(
+        processar_sped(nome_banco, progress_bar, label_arquivo, caminhos, janela)
+    )
+
     print(f"[DEBUG] Thread de processamento SPED finalizada")
+
+    if mensagem_final and mensageiro:
+        if result:
+            print("[DEBUG] Emitindo sinal de sucesso")
+            mensageiro.sinal_sucesso.emit(mensagem_final)
+        else:
+            print("[DEBUG] Emitindo sinal de erro")
+            mensageiro.sinal_erro.emit(mensagem_final)
+
+    progress_bar.setValue(0)
     loop.close()
+
 
 def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=None):
     print(f"[DEBUG] Solicitando seleção de arquivos SPED...")
@@ -33,10 +47,15 @@ def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=N
         print(f"[DEBUG] Nenhum arquivo selecionado.")
         return
 
+    mensageiro = Mensageiro()
+    mensageiro.sinal_sucesso.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
+    mensageiro.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
+
     print(f"[DEBUG] {len(caminhos)} arquivo(s) selecionado(s):")
     for i, caminho in enumerate(caminhos):
         print(f"[DEBUG]   {i+1}. {os.path.basename(caminho)} ({os.path.getsize(caminho)/1024:.1f} KB)")
-    thread = threading.Thread(target=processar_sped_thread, args=(nome_banco, progress_bar, label_arquivo, caminhos, janela))
+
+    thread = threading.Thread(target=processar_sped_thread, args=(nome_banco, progress_bar, label_arquivo, caminhos, janela, mensageiro))
     thread.start()
     print(f"[DEBUG] Thread de processamento SPED iniciada")
 
@@ -48,14 +67,15 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos, jane
 
     conexao = conectar_banco(nome_banco)
     if not conexao:
-        QTimer.singleShot(0, lambda: mensagem_error("Erro ao conectar ao banco", parent=janela))
-        return False
+        return False, "Erro ao conectar ao banco"
 
     cursor = conexao.cursor()
     cursor.execute("SHOW TABLES LIKE 'cadastro_tributacao'")
     if not cursor.fetchone():
-        QTimer.singleShot(0, lambda: mensagem_aviso("Tributação não encontrada, Envie primeiro a tributação.", parent=janela))
-        return False
+        cursor.close()
+        fechar_banco(conexao)
+        return False, "Tributação não encontrada. Envie primeiro a tributação."
+
     cursor.close()
 
     total = len(caminhos)
@@ -70,14 +90,16 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos, jane
                 )
             )
         resultados = await asyncio.gather(*tasks)
-        sucesso_total = all(resultados)
-        return sucesso_total
+        sucesso_total = all(r[0] for r in resultados)
+        mensagens = [r[1] for r in resultados if r[1]]
+        mensagem_final = "\n".join(mensagens)
+        return sucesso_total, mensagem_final
 
     except Exception as e:
         import traceback
-        print(traceback.format_exc())
-        QTimer.singleShot(0, lambda: mensagem_error("Erro inesperado durante o processo", parent=janela))
-        return False
+        print("[ERRO] Falha no processar_sped:", traceback.format_exc())
+        return False, f"Erro inesperado durante o processamento: {e}"
+
     finally:
         fechar_banco(conexao)
         progress_bar.setValue(100)
@@ -101,22 +123,20 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
             cursor = conexao.cursor()
 
             mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, nome_banco)
+
             conexao.commit()
             cursor.close()
             fechar_banco(conexao)
 
             progresso_atual = min(indice * progresso_por_arquivo, 100)
             progress_bar.setValue(progresso_atual)
-            
-            if mensagem.lower().startswith("falha") or mensagem.lower().startswith("erro"):
-                QTimer.singleShot(0, lambda: mensagem_error(mensagem, parent=janela))
-                return False
+
+            if isinstance(mensagem, str) and not mensagem.lower().startswith(("falha", "erro")):
+                return True, mensagem
             else:
-                QTimer.singleShot(0, lambda: mensagem_sucesso(mensagem, parent=janela))
-                return True
-            
+                return False, mensagem or "Erro desconhecido durante o salvamento."
+
         except Exception as e:
             import traceback
             print(traceback.format_exc())
-            QTimer.singleShot(0, lambda: mensagem_error(f"Erro ao processar o arquivo {nome_arquivo}: {e}", parent=janela))
-            return False
+            return False, f"Erro ao processar o arquivo {nome_arquivo}: {e}"
