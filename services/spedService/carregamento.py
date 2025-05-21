@@ -52,7 +52,7 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
             if conexao:
                 print("[DEBUG] Conexão com o banco estabelecida")
                 cursor = conexao.cursor()
-                cursor.execute("SELECT codigo, produto, ncm, aliquota FROM cadastro_tributacao WHERE aliquota IS NULL")
+                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
                 print("[DEBUG] Executando consulta para produtos com alíquotas nulas")
                 produtos_nulos = cursor.fetchall()
                 if produtos_nulos:

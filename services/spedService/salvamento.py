@@ -233,6 +233,29 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
                 contadores["erros"] += len(lote_ajustado)
                 print(f"[ERRO] Lote C170 {i}-{i+len(lote_ajustado)}: {e}")
 
+        print("[DEBUG] Iniciando verificação de produtos no cadastro_tributacao")
+        try:
+            codigos_inseridos = set()
+            for reg in lote_c170:
+                cod_item = reg[3]
+                produto = reg[4]
+                ncm = next((r[7] for r in lote_0200 if r[1] == cod_item), None)
+
+                if cod_item in codigos_inseridos:
+                    continue
+                
+                cursor.execute("SELECT 1 FROM cadastro_tributacao WHERE codigo = %s LIMIT 1", (cod_item,))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
+                        VALUES (%s, %s, %s, NULL)
+                    """, (cod_item, produto, ncm))
+                    codigos_inseridos.add(cod_item)
+
+            print(f"[DEBUG] {len(codigos_inseridos)} produtos adicionados ao cadastro_tributacao com aliquota NULL")
+        except Exception as e:
+            print(f"[ERRO] Falha ao popular cadastro_tributacao: {e}")
+
         print(f"[FINAL] Processamento concluído: {contadores}")
         return f"Processado com sucesso. {contadores['salvos']} itens salvos, {contadores['erros']} com erro."
 
