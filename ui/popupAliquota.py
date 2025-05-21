@@ -8,15 +8,14 @@ class PopupAliquota(QtWidgets.QDialog):
     def __init__(self, dados, nome_banco):
         super().__init__()
         self.setWindowTitle("Preencher Alíquotas Nulas")
-        self.setGeometry(300, 150, 800, 500)
-        self.setStyleSheet("background-color: #f0f0f0;")
+        self.setGeometry(300, 150, 900, 600)
 
         self.dados = dados
         self.nome_banco = nome_banco
-
         self.aliquotas = ["1.54%", "4.00%", "8.13%", "ST", "ISENTO"]
 
         self._setup_ui()
+        self._aplicar_estilo()
 
     def _setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -35,7 +34,7 @@ class PopupAliquota(QtWidgets.QDialog):
             combo.addItems(self.aliquotas)
             self.tabela.setCellWidget(row, 3, combo)
 
-        self.tabela.resizeColumnsToContents()
+        self.tabela.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         layout.addWidget(self.tabela)
 
         botoes_layout = QtWidgets.QHBoxLayout()
@@ -49,11 +48,51 @@ class PopupAliquota(QtWidgets.QDialog):
         botoes_layout.addWidget(btn_importar)
 
         btn_salvar = QtWidgets.QPushButton("Salvar Tudo")
-        btn_salvar.setStyleSheet("background-color: #28a745; color: white;")
+        btn_salvar.setObjectName("btn_salvar")
         btn_salvar.clicked.connect(self.salvar_todas)
         botoes_layout.addWidget(btn_salvar)
 
         layout.addLayout(botoes_layout)
+
+    def _aplicar_estilo(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #030d18;
+            }
+            QTableWidget {
+                background-color: #ffffff;
+                color: #000000;
+                gridline-color: #cccccc;
+                font-size: 14px;
+            }
+            QHeaderView::section {
+                background-color: #001F3F;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                border: 1px solid #2E236C;
+            }
+            QComboBox {
+                background-color: #ffffff;
+                color: #000000;
+            }
+            QPushButton {
+                padding: 6px 12px;
+                font-size: 14px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #2E236C;
+                color: white;
+            }
+            QPushButton#btn_salvar {
+                background-color: #28a745;
+                color: white;
+            }
+            QPushButton#btn_salvar:hover {
+                background-color: #218838;
+            }
+        """)
 
     def salvar_todas(self):
         conexao = conectar_banco(self.nome_banco)
@@ -109,12 +148,10 @@ class PopupAliquota(QtWidgets.QDialog):
                         preenchidos += 1
 
             mensagem_sucesso(f"Planilha importada com sucesso. {preenchidos} itens preenchidos.")
-
         except Exception as e:
             mensagem_error(f"Erro ao importar planilha: {e}")
 
     def gerar_planilha_modelo(self):
-        from PySide6.QtWidgets import QFileDialog
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Planilha Modelo", "modelo_aliquotas.xlsx", "Excel (*.xlsx)")
         if not caminho:
             return
