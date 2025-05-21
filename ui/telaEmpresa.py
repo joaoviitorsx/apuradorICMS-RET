@@ -37,6 +37,7 @@ class EmpresaWindow(QtWidgets.QWidget):
         self.entrar_btn.setStyleSheet(self._botao_estilo())
         self.entrar_btn.setFixedWidth(400)
         self.entrar_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.entrar_btn.setEnabled(False)
         self.entrar_btn.clicked.connect(self.entrar)
         self.layout.addWidget(self.entrar_btn, alignment=QtCore.Qt.AlignCenter)
 
@@ -69,6 +70,10 @@ class EmpresaWindow(QtWidgets.QWidget):
                 background-color: #005588;
                 color: white;
             }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #cccccc;
+            }
         """
 
     def entrar(self):
@@ -92,12 +97,13 @@ class EmpresaWindow(QtWidgets.QWidget):
         self.combo_empresas.addItem("Selecione uma empresa")
         self.combo_empresas.addItems(lista_empresas)
         self.combo_empresas.model().item(0).setEnabled(False)
+        self.entrar_btn.setEnabled(True)
 
     def exibir_erro_empresas(self, erro):
         QtWidgets.QMessageBox.critical(self, "Erro", f"Erro ao carregar empresas: {erro}")
         self.combo_empresas.clear()
         self.combo_empresas.addItem("Erro ao carregar")
-
+        self.entrar_btn.setEnabled(False)
 
 class EmpresaLoader(QtCore.QThread):
     empresas_carregadas = QtCore.Signal(list)
