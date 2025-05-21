@@ -115,6 +115,7 @@ def enviar_tributacao(nome_banco, progress_bar):
         conexao.commit()
         progress_bar.setValue(100)
         mensagem_sucesso("Tributação enviada com sucesso!")
+        progress_bar.setValue(0)
 
     except Exception as e:
         mensagem_error(f"Erro ao processar o arquivo: {str(e)}")
