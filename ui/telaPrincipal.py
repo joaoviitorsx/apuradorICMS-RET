@@ -4,7 +4,6 @@ from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
-from services.exportacaoServiceThread import ExportarTabelaThread
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa):
@@ -20,15 +19,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QtWidgets.QVBoxLayout(self.central_widget)
 
-        self.frame_db = QtWidgets.QGroupBox('Empresa')
-        self.frame_layout = QtWidgets.QVBoxLayout(self.frame_db)
-
-        self.label_nome_banco = QtWidgets.QLabel(f'{self.empresa}')
-        self.label_nome_banco.setStyleSheet('font-size: 20px; font-weight: bold; color: #ffffff; font-family: Arial;')
-        self.frame_layout.addWidget(self.label_nome_banco)
-
-        self.layout.addWidget(self.frame_db)
-
+        self._setup_empresa_header()
         self._criar_botoes()
 
         self.label_arquivo = QtWidgets.QLabel('Nenhum arquivo selecionado')
@@ -46,6 +37,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.layout.addWidget(self.progress_bar)
 
         self._criar_seletor_mes_ano()
+
+    def _setup_empresa_header(self):
+        self.frame_db = QtWidgets.QGroupBox('Empresa')
+        self.frame_layout = QtWidgets.QVBoxLayout(self.frame_db)
+
+        self.label_nome_banco = QtWidgets.QLabel(f'{self.empresa}')
+        self.label_nome_banco.setStyleSheet('font-size: 20px; font-weight: bold; color: #ffffff; font-family: Arial;')
+        self.frame_layout.addWidget(self.label_nome_banco)
+
+        self.layout.addWidget(self.frame_db)
 
     def _criar_botoes(self):
         botao_frame = QtWidgets.QHBoxLayout()
@@ -87,13 +88,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.layout.addLayout(mes_frame)
 
         self.mes_var = QtWidgets.QComboBox()
-        self.mes_var.addItems(['Escolha o mês', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'])
+        self.mes_var.addItems(['Escolha o mês'] + [f"{i:02}" for i in range(1, 13)])
         self.mes_var.setStyleSheet("font-size: 16px; padding: 5px; color: #000000; background-color: #ffffff;")
         mes_frame.addWidget(self.mes_var)
 
         self.ano_var = QtWidgets.QComboBox()
         ano_atual = QtCore.QDate.currentDate().year()
-        self.ano_var.addItems(['Escolha o ano', str(ano_atual-2), str(ano_atual-1), str(ano_atual), str(ano_atual+1)])
+        self.ano_var.addItems(['Escolha o ano'] + [str(ano_atual - i) for i in range(0, 4)][::-1])
         self.ano_var.setStyleSheet("font-size: 16px; padding: 5px; color: #000000; background-color: #ffffff;")
         mes_frame.addWidget(self.ano_var)
 
@@ -116,8 +117,7 @@ class MainWindow(QtWidgets.QMainWindow):
         mes_frame.addWidget(btn_baixar_tabela)
 
     def _baixar_tabela(self):
-        from services.exportacaoServiceThread import ExportarTabelaThread
-        from utils.mensagem import mensagem_aviso, mensagem_sucesso
+        from services.exportacaoService import exportar_resultado
 
         mes = self.mes_var.currentText()
         ano = self.ano_var.currentText()
@@ -126,23 +126,6 @@ class MainWindow(QtWidgets.QMainWindow):
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
 
-        self.thread_exportar = ExportarTabelaThread(self.empresa_sem_espacos, mes, ano)
-        self.thread_exportar.progresso.connect(self.progress_bar.setValue)
-        self.thread_exportar.mensagem.connect(lambda msg: mensagem_sucesso(msg) if "sucesso" in msg.lower() else mensagem_aviso(msg))
-        self.thread_exportar.abrir_popup.connect(self._abrir_popup_aliquota)
-
-        self.thread_exportar.start()
-
-    def _abrir_popup_aliquota(self, dados):
-        from ui.popupAliquota import PopupAliquota
-        popup = PopupAliquota(dados, self.empresa_sem_espacos)
-        resultado = popup.exec()
-
-        if resultado == QtWidgets.QDialog.Accepted:
-            self._concluir_exportacao()
-
-    def _concluir_exportacao(self):
-        from services.exportacaoService import exportar_resultado
-        mes = self.mes_var.currentText()
-        ano = self.ano_var.currentText()
+        self.progress_bar.setValue(0)
         exportar_resultado(self.empresa_sem_espacos, mes, ano, self.progress_bar)
+        self.progress_bar.setValue(0)
