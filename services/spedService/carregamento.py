@@ -20,7 +20,7 @@ class Mensageiro(QObject):
     sinal_erro = Signal(str)
     sinal_verificar_aliquotas = Signal(list)
 
-def tratar_aliquotas_nulas(produtos_nulos, janela):
+def tratar_aliquotas_nulas(produtos_nulos, nome_banco, janela):
     box = QMessageBox(janela)
     box.setIcon(QMessageBox.Warning)
     box.setWindowTitle("Alíquotas Nulas")
@@ -30,7 +30,7 @@ def tratar_aliquotas_nulas(produtos_nulos, janela):
     resposta = box.exec()
 
     if resposta == QMessageBox.Yes:
-        tela = PopupAliquota(produtos_nulos, janela)
+        tela = PopupAliquota(produtos_nulos, nome_banco, janela)
         tela.exec()
 
 def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
@@ -89,7 +89,7 @@ def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=N
     mensageiro = Mensageiro()
     mensageiro.sinal_sucesso.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
     mensageiro.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
-    mensageiro.sinal_verificar_aliquotas.connect(lambda produtos: tratar_aliquotas_nulas(produtos, janela))
+    mensageiro.sinal_verificar_aliquotas.connect(lambda produtos: tratar_aliquotas_nulas(produtos, nome_banco, janela))
     mensageiro_fornecedor.sinal_log.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
     mensageiro_fornecedor.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
 
