@@ -29,13 +29,15 @@ async def atualizar_aliquota(nome_banco):
         cursor.execute("SELECT dt_ini FROM `0000` ORDER BY id DESC LIMIT 1")
         dt_ini = cursor.fetchone()[0]
         ano = int(dt_ini[4:]) if dt_ini and len(dt_ini) >= 6 else 0
-
         coluna_origem = "aliquota" if ano >= 2024 else "aliquota_antiga"
 
         cursor.execute(f"""
             UPDATE c170_clone n
             JOIN cadastro_tributacao c ON n.cod_item = c.codigo
-            SET n.aliquota = c.{coluna_origem}
+            SET n.aliquota = CONCAT(
+                REPLACE(FORMAT(CAST(REPLACE(REPLACE(c.{coluna_origem}, '%', ''), ',', '.') AS DECIMAL(10, 2)), 2), '.', ','),
+                '%'
+            )
             WHERE n.aliquota IS NULL OR n.aliquota = ''
         """)
         conexao.commit()
@@ -57,13 +59,18 @@ async def atualizar_aliquota_simples(nome_banco):
         cursor.execute("""
             UPDATE c170_clone c
             JOIN cadastro_fornecedores f ON f.cod_part = c.cod_part
-            SET c.aliquota = CONCAT(FORMAT(REPLACE(c.aliquota, '%', '') + 3, 2), '%')
+            SET c.aliquota = CONCAT(
+                REPLACE(FORMAT(
+                    CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00,
+                    2
+                ), '.', ','),
+                '%'
+            )
             WHERE f.simples = 'Sim'
-            AND c.aliquota REGEXP '^[0-9]+(\\.[0-9]*)?%?$'
+              AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
         """)
         conexao.commit()
         print("Tabela c170_clone atualizada com acréscimo de 3% para Simples Nacional.")
-
     except Exception as e:
         print(f"Erro ao atualizar alíquota simples: {e}")
         conexao.rollback()
@@ -82,8 +89,8 @@ async def atualizar_resultado(nome_banco):
             SET resultado = CASE
                 WHEN aliquota REGEXP '^[A-Za-z]' THEN 0
                 WHEN aliquota IS NULL OR aliquota = '' THEN 0
-                ELSE CAST(REPLACE(vl_item, ',', '.') AS DECIMAL(10, 2)) * 
-                     (CAST(REPLACE(aliquota, '%', '') AS DECIMAL(10, 2)) / 100)
+                ELSE CAST(REPLACE(REPLACE(vl_item, '.', ''), ',', '.') AS DECIMAL(10, 2)) *
+                     (CAST(REPLACE(REPLACE(aliquota, '%', ''), ',', '.') AS DECIMAL(10, 4)) / 100)
             END
         """)
         conexao.commit()
