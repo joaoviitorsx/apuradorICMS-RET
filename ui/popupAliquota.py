@@ -5,8 +5,9 @@ from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QFileDialog
 
 class PopupAliquota(QtWidgets.QDialog):
-    def __init__(self, dados, nome_banco="empresas_db"):
+    def __init__(self, dados, nome_banco, parent=None):
         super().__init__()
+        self.nome_banco = nome_banco
         self.setWindowTitle("Preencher Alíquotas Nulas")
         self.setGeometry(300, 150, 900, 600)
 
@@ -94,8 +95,11 @@ class PopupAliquota(QtWidgets.QDialog):
             }
         """)
 
-    def salvar_todas(self, nome_banco):
-        conexao = conectar_banco(nome_banco)
+    def salvar_todas(self):
+        conexao = conectar_banco(self.nome_banco)
+        if not conexao:
+            mensagem_error("Erro ao conectar ao banco de dados.")
+            return
         cursor = conexao.cursor()
         try:
             for row in range(self.tabela.rowCount()):
