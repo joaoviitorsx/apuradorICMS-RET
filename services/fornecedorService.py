@@ -1,70 +1,68 @@
 from db.conexao import conectar_banco, fechar_banco
 from utils.cnpj import processar_cnpjs
-from utils.mensagem import mensagem_error, mensagem_sucesso
-import logging
+from PySide6.QtCore import QObject, Signal
+class Mensageiro(QObject):
+    sinal_log = Signal(str)
+    sinal_erro = Signal(str)
 
-logging.basicConfig(level=logging.INFO)
+mensageiro = Mensageiro()
 
 async def comparar_adicionar_atualizar_fornecedores(nome_banco):
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
     try:
-        cursor.execute("""
-            SHOW COLUMNS FROM cadastro_fornecedores
-            WHERE Field IN ('cnae', 'decreto', 'uf', 'simples')
-        """)
-        columns = [row[0] for row in cursor.fetchall()]
-
-        if not all(col in columns for col in ['cnae', 'decreto', 'uf', 'simples']):
-            mensagem_error("Colunas obrigatórias ausentes na tabela 'cadastro_fornecedores'.")
-            return
-
-        cursor.execute("""
+        query_novos = """
             SELECT f.cod_part, f.nome, f.cnpj
             FROM `0150` f
             LEFT JOIN cadastro_fornecedores cf ON f.cod_part = cf.cod_part
             WHERE cf.cod_part IS NULL AND f.cnpj IS NOT NULL AND f.cnpj != ''
-        """)
-        novos_fornecedores = cursor.fetchall()
+        """
+        cursor.execute(query_novos)
+        fornecedores_novos = cursor.fetchall()
 
-        for cod_part, nome, cnpj in novos_fornecedores:
-            cursor.execute("""
+        if fornecedores_novos:
+            insert_query = """
                 INSERT INTO cadastro_fornecedores (cod_part, nome, cnpj, uf, cnae, decreto, simples)
-                VALUES (%s, %s, %s, '', '', '', '')
-            """, (cod_part, nome, cnpj))
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            dados = [(cod, nome, cnpj, '', '', '', '') for cod, nome, cnpj in fornecedores_novos]
+            cursor.executemany(insert_query, dados)
+            conexao.commit()
+            mensageiro.sinal_log.emit(f"{len(fornecedores_novos)} fornecedor(es) novo(s) inserido(s).")
 
-        cursor.execute("""
-            SELECT cnpj FROM cadastro_fornecedores
+        query_cnpjs = """
+            SELECT cnpj
+            FROM cadastro_fornecedores
             WHERE (cnae IS NULL OR cnae = '') AND (decreto IS NULL OR decreto = '') AND (uf IS NULL OR uf = '')
-        """)
-        cnpjs = [row[0] for row in cursor.fetchall()]
+        """
+        cursor.execute(query_cnpjs)
+        cnpjs_para_atualizar = [row[0] for row in cursor.fetchall()]
 
-        if not cnpjs:
-            logging.info("Nenhum CNPJ pendente de atualização.")
+        if not cnpjs_para_atualizar:
+            mensageiro.sinal_log.emit("Nenhum fornecedor para atualizar.")
             return
 
-        BATCH_SIZE = 100
-        total_atualizados = 0
+        resultados = await processar_cnpjs(cnpjs_para_atualizar)
 
-        for i in range(0, len(cnpjs), BATCH_SIZE):
-            batch = cnpjs[i:i + BATCH_SIZE]
-            resultados = await processar_cnpjs(batch)
+        update_query = """
+            UPDATE cadastro_fornecedores
+            SET cnae = %s, decreto = %s, uf = %s, simples = %s
+            WHERE cnpj = %s
+        """
 
-            for cnpj, (cnae, decreto, uf, simples) in resultados.items():
-                cursor.execute("""
-                    UPDATE cadastro_fornecedores
-                    SET cnae = %s, decreto = %s, uf = %s, simples = %s
-                    WHERE cnpj = %s
-                """, (cnae, decreto, uf, simples, cnpj))
-                total_atualizados += 1
+        dados_update = []
+        for cnpj, (cnae, decreto, uf, simples) in resultados.items():
+            dados_update.append((cnae, decreto, uf, simples, cnpj))
 
-        conexao.commit()
-        mensagem_sucesso(f"Fornecedores atualizados com sucesso: {total_atualizados}")
+        if dados_update:
+            cursor.executemany(update_query, dados_update)
+            conexao.commit()
+            mensageiro.sinal_log.emit(f"{len(dados_update)} fornecedor(es) atualizado(s) com sucesso.")
 
     except Exception as e:
         conexao.rollback()
-        mensagem_error(f"Erro ao atualizar fornecedores: {str(e)}")
+        mensageiro.sinal_erro.emit(f"Erro ao atualizar fornecedores: {e}")
 
     finally:
         cursor.close()
