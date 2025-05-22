@@ -1,6 +1,7 @@
 from db.conexao import conectar_banco, fechar_banco
 
 async def atualizar_ncm(nome_banco):
+    print("Atualizando NCM...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
     try:
@@ -20,6 +21,7 @@ async def atualizar_ncm(nome_banco):
         fechar_banco(conexao)
 
 async def atualizar_aliquota(nome_banco):
+    print("Atualizando alíquotas...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
@@ -47,6 +49,7 @@ async def atualizar_aliquota(nome_banco):
         fechar_banco(conexao)
 
 async def atualizar_aliquota_simples(nome_banco):
+    print("Atualizando alíquotas para Simples Nacional...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
@@ -69,6 +72,7 @@ async def atualizar_aliquota_simples(nome_banco):
         fechar_banco(conexao)
 
 async def atualizar_resultado(nome_banco):
+    print("Atualizando resultado...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
