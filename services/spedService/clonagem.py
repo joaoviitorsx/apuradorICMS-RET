@@ -1,17 +1,18 @@
 from db.conexao import conectar_banco, fechar_banco
 
 async def clonar_tabela_c170(nome_banco):
+    print("Clonando a tabela c170...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
     try:
         cursor.execute("""
             INSERT IGNORE INTO c170_clone (
-                id, periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc, cfop,
+                periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc, cfop,
                 id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, aliquota, resultado, chavefinal
             )
             SELECT 
-                id, periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc, cfop,
+                periodo, reg, num_item, cod_item, descr_compl, qtd, unid, vl_item, vl_desc, cfop,
                 id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, aliquota, resultado,
                 CONCAT(cod_item, chv_nfe) AS chavefinal
             FROM c170
