@@ -10,6 +10,8 @@ from utils.processData import process_data
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from .salvamento import salvar_no_banco_em_lote
 from ui.popupAliquota import PopupAliquota
+from .pos_processamento import etapas_pos_processamento
+from services.fornecedorService import mensageiro as mensageiro_fornecedor
 
 sem_limite = asyncio.Semaphore(3)
 
@@ -88,6 +90,8 @@ def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=N
     mensageiro.sinal_sucesso.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
     mensageiro.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
     mensageiro.sinal_verificar_aliquotas.connect(lambda produtos: tratar_aliquotas_nulas(produtos, janela))
+    mensageiro_fornecedor.sinal_log.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
+    mensageiro_fornecedor.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
 
     print(f"[DEBUG] {len(caminhos)} arquivo(s) selecionado(s):")
     for i, caminho in enumerate(caminhos):
@@ -166,6 +170,8 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
             progress_bar.setValue(progresso_atual)
 
             if isinstance(mensagem, str) and not mensagem.lower().startswith(("falha", "erro")):
+                print(f"[DEBUG] {mensagem}")
+                await etapas_pos_processamento(nome_banco, progress_bar)
                 return True, mensagem
             else:
                 return False, mensagem or "Erro desconhecido durante o salvamento."
