@@ -17,8 +17,6 @@ async def etapas_pos_processamento(nome_banco, progress_bar):
     progress_bar.setValue(55)
     await atualizar_cadastro_tributacao(nome_banco)
     progress_bar.setValue(60)
-    await tela_popup(nome_banco, progress_bar)
-    progress_bar.setValue(70)
     await clonar_tabela_c170(nome_banco)
     progress_bar.setValue(80)
     await atualizar_ncm(nome_banco)
