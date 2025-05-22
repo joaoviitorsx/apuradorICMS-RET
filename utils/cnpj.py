@@ -4,6 +4,7 @@ import re
 from functools import wraps
 from time import time
 
+
 def create_cache(ttl=3600):
     cache_dict = {}
     def decorator(func):
@@ -21,8 +22,10 @@ def create_cache(ttl=3600):
         return wrapper
     return decorator
 
+
 def remover_caracteres_nao_numericos(valor):
     return re.sub(r'\D', '', valor)
+
 
 lista_cnaes = [
     '4623108', '4623199', '4632001', '4637107', '4639701', '4639702', 
@@ -36,8 +39,9 @@ lista_cnaes = [
 cache_resultados = {}
 semaforo = asyncio.Semaphore(10)
 
+
 @create_cache()
-async def buscar_informacoes(cnpj, tentativas=2):
+async def buscar_informacoes(cnpj, tentativas=3):
     url = f'https://minhareceita.org/{cnpj}'
     timeout = aiohttp.ClientTimeout(total=10)
 
@@ -62,24 +66,37 @@ async def buscar_informacoes(cnpj, tentativas=2):
                 print(f"[{tentativa}] Erro inesperado no CNPJ {cnpj}: {e}")
         return None, None, None, None
 
+
+async def _processar_cnpj(cnpj, resultados):
+    cnpj_limpo = remover_caracteres_nao_numericos(cnpj)
+    cnae_codigo, existe_na_lista, uf, simples = await buscar_informacoes(cnpj_limpo)
+
+    if all([cnae_codigo, existe_na_lista, uf]):
+        resultados[cnpj] = (cnae_codigo, existe_na_lista, uf, simples)
+        cache_resultados[cnpj] = resultados[cnpj]
+    else:
+        print(f"[ERRO] Não foi possível obter dados válidos para o CNPJ {cnpj}. Ignorado.")
+
+
 async def processar_cnpjs(cnpjs):
     resultados = {}
     tasks = []
 
     for cnpj in cnpjs:
         if cnpj in cache_resultados:
-            resultados[cnpj] = cache_resultados[cnpj]
+            resultado = cache_resultados[cnpj]
+            if all(resultado):
+                resultados[cnpj] = resultado
+            else:
+                print(f"[CACHE ERRO] Resultado inválido em cache para {cnpj}. Ignorando.")
         else:
             tasks.append(_processar_cnpj(cnpj, resultados))
 
-    await asyncio.gather(*tasks)
+    if tasks:
+        await asyncio.gather(*tasks)
+
     return resultados
 
-async def _processar_cnpj(cnpj, resultados):
-    cnpj_limpo = remover_caracteres_nao_numericos(cnpj)
-    cnae_codigo, existe_na_lista, uf, simples = await buscar_informacoes(cnpj_limpo)
-    resultados[cnpj] = (cnae_codigo, existe_na_lista, uf, simples)
-    cache_resultados[cnpj] = (cnae_codigo, existe_na_lista, uf, simples)
 
 def validar_cnpj(cnpj):
     cnpj = ''.join(filter(str.isdigit, cnpj))
@@ -99,6 +116,7 @@ def validar_cnpj(cnpj):
     digito2 = 0 if digito2 > 9 else digito2
 
     return int(cnpj[13]) == digito2
+
 
 def formatar_cnpj(cnpj):
     cnpj = ''.join(filter(str.isdigit, cnpj))
