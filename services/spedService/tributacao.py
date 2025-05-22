@@ -1,6 +1,7 @@
 from db.conexao import conectar_banco, fechar_banco
 
 async def criar_e_preencher_c170nova(nome_banco):
+    print("Criando e preenchendo c170nova...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
@@ -57,6 +58,7 @@ async def criar_e_preencher_c170nova(nome_banco):
     print("c170nova preenchida com sucesso.")
 
 async def atualizar_cadastro_tributacao(nome_banco):
+    print("Atualizando cadastro_tributacao...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
