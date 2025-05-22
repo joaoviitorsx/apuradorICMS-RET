@@ -84,5 +84,20 @@ async def atualizar_cadastro_tributacao(nome_banco):
         conexao.rollback()
         print(f"Erro ao atualizar cadastro_tributacao: {e}")
     finally:
-        cursor.close()
-        fechar_banco(conexao)
+        try:
+            print("[SANITIZAÇÃO] Limpando alíquotas inválidas...")
+            cursor.execute("""
+                UPDATE cadastro_tributacao
+                SET aliquota = NULL
+                WHERE
+                    TRIM(aliquota) NOT REGEXP '^[0-2]?[0-9](,[0-9]{1,2})?%$'
+                    OR CAST(REPLACE(REPLACE(aliquota, '%', ''), ',', '.') AS DECIMAL(5,2)) > 30
+            """)
+            conexao.commit()
+            print("[OK] Alíquotas inválidas foram resetadas para NULL.")
+        except Exception as e:
+            conexao.rollback()
+            print(f"[ERRO] ao limpar alíquotas inválidas: {e}")
+        finally:
+            cursor.close()
+            fechar_banco(conexao)

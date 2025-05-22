@@ -21,7 +21,7 @@ async def atualizar_ncm(nome_banco):
         fechar_banco(conexao)
 
 async def atualizar_aliquota(nome_banco):
-    print("Atualizando alíquotas...")
+    print("Atualizando alíquotas com validação...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
@@ -30,18 +30,23 @@ async def atualizar_aliquota(nome_banco):
         dt_ini = cursor.fetchone()[0]
         ano = int(dt_ini[4:]) if dt_ini and len(dt_ini) >= 6 else 0
         coluna_origem = "aliquota" if ano >= 2024 else "aliquota_antiga"
+        print(f"[DEBUG] Coluna usada para alíquota: {coluna_origem}")
 
         cursor.execute(f"""
             UPDATE c170_clone n
             JOIN cadastro_tributacao c ON n.cod_item = c.codigo
             SET n.aliquota = CONCAT(
-                REPLACE(FORMAT(CAST(REPLACE(REPLACE(c.{coluna_origem}, '%', ''), ',', '.') AS DECIMAL(10, 2)), 2), '.', ','),
-                '%'
+                REPLACE(FORMAT(
+                    CAST(REPLACE(REPLACE(c.{coluna_origem}, '%', ''), ',', '.') AS DECIMAL(5, 2)),
+                    2
+                ), '.', ','), '%'
             )
-            WHERE n.aliquota IS NULL OR n.aliquota = ''
+            WHERE (n.aliquota IS NULL OR n.aliquota = '')
+              AND c.{coluna_origem} REGEXP '^[0-9]+(,[0-9]{1,2})?%?$'
+              AND CAST(REPLACE(REPLACE(c.{coluna_origem}, '%', ''), ',', '.') AS DECIMAL(5,2)) <= 30
         """)
         conexao.commit()
-        print("Tabela c170_clone atualizada com alíquotas da cadastro_tributacao.")
+        print("Alíquotas válidas aplicadas à tabela c170_clone.")
 
     except Exception as err:
         print(f"Erro ao atualizar alíquotas: {err}")
@@ -51,28 +56,42 @@ async def atualizar_aliquota(nome_banco):
         fechar_banco(conexao)
 
 async def atualizar_aliquota_simples(nome_banco):
-    print("Atualizando alíquotas para Simples Nacional...")
+    print("Iniciando atualização de alíquotas para Simples Nacional...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
     try:
         cursor.execute("""
-            UPDATE c170_clone c
+            SELECT COUNT(*) FROM c170_clone c
             JOIN cadastro_fornecedores f ON f.cod_part = c.cod_part
-            SET c.aliquota = CONCAT(
-                REPLACE(FORMAT(
-                    CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00,
-                    2
-                ), '.', ','),
-                '%'
-            )
             WHERE f.simples = 'Sim'
               AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
+              AND CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) <= 20.00
+        """)
+        count = cursor.fetchone()[0]
+        print(f"[DEBUG] Registros encontrados para ajuste: {count}")
+
+        cursor.execute("""
+            UPDATE c170_clone c
+            JOIN cadastro_fornecedores f ON f.cod_part = c.cod_part
+            SET c.aliquota = CASE
+                WHEN 
+                    CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00 <= 30.00
+                THEN CONCAT(
+                    REPLACE(FORMAT(
+                        CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00,
+                        2
+                    ), '.', ','), '%')
+                ELSE NULL  -- ou mantenha c.aliquota original, se preferir
+            END
+            WHERE f.simples = 'Sim'
+              AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
+              AND CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) <= 20.00
         """)
         conexao.commit()
-        print("Tabela c170_clone atualizada com acréscimo de 3% para Simples Nacional.")
+        print(f"Conclusão: {count} atualizados (caso tenham passado no filtro).")
     except Exception as e:
-        print(f"Erro ao atualizar alíquota simples: {e}")
+        print(f"ERRO GERAL: {e}")
         conexao.rollback()
     finally:
         cursor.close()
@@ -88,13 +107,13 @@ async def atualizar_resultado(nome_banco):
             UPDATE c170_clone
             SET resultado = CASE
                 WHEN aliquota REGEXP '^[A-Za-z]' THEN 0
-                WHEN aliquota IS NULL OR aliquota = '' THEN 0
+                WHEN aliquota IS NULL OR TRIM(aliquota) = '' THEN 0
                 ELSE CAST(REPLACE(REPLACE(vl_item, '.', ''), ',', '.') AS DECIMAL(10, 2)) *
                      (CAST(REPLACE(REPLACE(aliquota, '%', ''), ',', '.') AS DECIMAL(10, 4)) / 100)
             END
         """)
         conexao.commit()
-        print("Tabela c170_clone atualizada com resultados calculados.")
+        print("Resultados calculados com base em vl_item e aliquota.")
     except Exception as err:
         print(f"Erro ao atualizar resultado: {err}")
         conexao.rollback()
