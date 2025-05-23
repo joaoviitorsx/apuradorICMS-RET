@@ -253,10 +253,16 @@ def atualizar_aliquotas_e_resultado(nome_banco):
         await atualizar_resultado(nome_banco)
 
     try:
-        if asyncio.get_event_loop().is_running():
-            asyncio.create_task(_executar())
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(_executar())
         else:
-            asyncio.run(_executar())
+            loop.run_until_complete(_executar())
+    except RuntimeError:
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        new_loop.run_until_complete(_executar())
+        new_loop.close()
     except Exception as e:
         print(f"[ERRO] Falha ao atualizar alíquotas e resultados: {e}")
 
