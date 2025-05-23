@@ -1,30 +1,37 @@
 def process_data(data: str) -> str:
-    lines = data.strip().split('\n')
-    output = []
-    current_c100_id = None
+    linhas = data.strip().splitlines()
+    resultado = []
+    id_c100_atual = None
 
-    for line in lines:
-        if not line.startswith('|'):
+    for i, linha in enumerate(linhas):
+        linha = linha.strip()
+
+        if not linha.startswith('|'):
             continue
 
-        partes = line.split('|')
+        partes = linha.split('|')
         if len(partes) < 2:
+            print(f"[WARN] Linha malformada ignorada na linha {i}: '{linha}'")
             continue
 
-        registro = partes[1]
+        tipo_registro = partes[1]
 
-        if registro == 'C100':
-            current_c100_id = partes[2] if len(partes) > 2 else None
-            output.append(line)
+        if tipo_registro == 'C100':
+            id_c100_atual = partes[2] if len(partes) > 2 else None
+            resultado.append(linha)
 
-        elif registro == 'C170':
-            if current_c100_id:
-                nova_linha = '|'.join(partes[:2] + [current_c100_id] + partes[2:])
-                output.append(nova_linha)
+        elif tipo_registro == 'C170':
+            if id_c100_atual:
+                nova_linha = '|'.join(partes[:2] + [id_c100_atual] + partes[2:])
+                resultado.append(nova_linha)
             else:
-                output.append(line)
+                print(f"[WARN] C170 sem C100 relacionado na linha {i}")
+                resultado.append(linha)
 
-        elif registro in ('0000', '0150', '0200'):
-            output.append(line)
+        elif tipo_registro in ('0000', '0150', '0200'):
+            resultado.append(linha)
 
-    return '\n'.join(output)
+        else:
+            pass
+
+    return '\n'.join(resultado)

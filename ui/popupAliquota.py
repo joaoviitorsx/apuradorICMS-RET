@@ -3,6 +3,7 @@ from utils.mensagem import mensagem_error, mensagem_sucesso
 import pandas as pd
 from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QFileDialog
+from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
 class PopupAliquota(QtWidgets.QDialog):
     def __init__(self, dados, nome_banco, parent=None):
@@ -114,6 +115,21 @@ class PopupAliquota(QtWidgets.QDialog):
                 """, (aliquota, codigo))
             conexao.commit()
             mensagem_sucesso("Alíquotas salvas com sucesso!")
+
+            cursor.execute("""
+                SELECT codigo, aliquota FROM cadastro_tributacao
+                WHERE codigo IN (%s)
+            """ % ",".join(["%s"] * self.tabela.rowCount()),
+                [self.tabela.item(row, 0).text() for row in range(self.tabela.rowCount())]
+            )
+            print("[DEBUG] Aliquotas salvas no cadastro_tributacao:")
+            for linha in cursor.fetchall():
+                print(f" - Código: {linha[0]} | Alíquota: {linha[1]}")
+
+            print("[DEBUG] Chamando atualizar_aliquotas_e_resultado...")
+            atualizar_aliquotas_e_resultado(self.nome_banco)
+            print("[DEBUG] Finalizado atualizar_aliquotas_e_resultado.")
+
             self.accept()
         except Exception as e:
             mensagem_error(f"Erro ao salvar alíquotas: {e}")

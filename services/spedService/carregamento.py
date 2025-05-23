@@ -12,6 +12,7 @@ from .salvamento import salvar_no_banco_em_lote
 from ui.popupAliquota import PopupAliquota
 from .pos_processamento import etapas_pos_processamento
 from services.fornecedorService import mensageiro as mensageiro_fornecedor
+from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
 sem_limite = asyncio.Semaphore(3)
 
@@ -31,7 +32,12 @@ def tratar_aliquotas_nulas(produtos_nulos, nome_banco, janela):
 
     if resposta == QMessageBox.Yes:
         tela = PopupAliquota(produtos_nulos, nome_banco, janela)
-        tela.exec()
+        resultado = tela.exec()
+
+        if resultado == 1:
+            print("[DEBUG] Atualizando c170_clone com novas alíquotas preenchidas...")
+            atualizar_aliquotas_e_resultado(nome_banco)
+
 
 def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
     print(f"[DEBUG] Iniciando thread de processamento SPED com {len(caminhos)} arquivo(s)")
@@ -54,7 +60,7 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
             if conexao:
                 print("[DEBUG] Conexão com o banco estabelecida")
                 cursor = conexao.cursor()
-                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL")
                 print("[DEBUG] Executando consulta para produtos com alíquotas nulas")
                 produtos_nulos = cursor.fetchall()
                 if produtos_nulos:

@@ -1,4 +1,6 @@
 import os
+import re
+import asyncio
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
@@ -6,8 +8,11 @@ from ui.popupAliquota import PopupAliquota
 from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
+from utils.sanitizacao import is_aliquota_valida, atualizar_aliquotas_e_resultado
+from services.spedService.atualizacoes import atualizar_aliquota, atualizar_resultado
 
 def exportar_resultado(nome_banco, mes, ano, progress_bar):
+    print(f"[DEBUG] Exportando resultado para {mes}/{ano} no banco {nome_banco}")
     try:
         progress_bar.setValue(5)
         periodo = f"{mes}/{ano}"
@@ -18,6 +23,21 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
             return
 
         cursor = conexao.cursor()
+
+        cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+        produtos_nulos = cursor.fetchall()
+
+        if produtos_nulos:
+            popup = PopupAliquota(produtos_nulos, nome_banco)
+            resultado = popup.exec()
+            if resultado != 1:
+                mensagem_aviso("Preenchimento de alíquotas cancelado.")
+                return
+
+        atualizar_aliquotas_e_resultado(nome_banco)
+
+        cursor.execute("SELECT COUNT(*) FROM c170_clone WHERE periodo = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')", (periodo,))
+        print("[DEBUG] Registros com aliquota nula na exportação:", cursor.fetchone()[0])
 
         cursor.execute("""
             SELECT c.*, f.nome, f.cnpj 
@@ -34,19 +54,11 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
         colunas = [desc[0] for desc in cursor.description]
         df = pd.DataFrame(dados, columns=colunas)
 
-        cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
-        produtos_nulos = cursor.fetchall()
-
-        if produtos_nulos:
-            popup = PopupAliquota(produtos_nulos, nome_banco)
-            resultado = popup.exec()
-            if resultado != 1:
-                mensagem_aviso("Preenchimento de alíquotas cancelado.")
-                return
-
         for campo in ['resultado', 'vl_item', 'aliquota']:
             if campo in df.columns:
                 df[campo] = df[campo].astype(str).str.replace('.', ',', regex=False)
+        if 'aliquota' in df.columns:
+            df['aliquota'] = df['aliquota'].apply(lambda x: x if is_aliquota_valida(x) else '')
 
         cursor.execute("SELECT cnpj FROM `0000` ORDER BY id DESC LIMIT 1")
         cnpj = cursor.fetchone()[0]
@@ -109,3 +121,4 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
             fechar_banco(conexao_emp)
         except:
             pass
+

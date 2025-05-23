@@ -263,4 +263,3 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
         print("[FATAL] Erro durante o salvamento:", e)
         print(traceback.format_exc())
         return f"Erro geral ao salvar: {e}"
-

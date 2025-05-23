@@ -5,6 +5,7 @@ from db.conexao import conectar_banco, fechar_banco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
 from ui.popupAliquota import PopupAliquota
+from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
@@ -86,12 +87,12 @@ def enviar_tributacao(nome_banco, progress_bar):
         dados_para_inserir = df_inserir.values.tolist()
 
         cursor.executemany("""
-            INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
+            INSERT INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
             VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
-            produto = VALUES(produto),
-            ncm = VALUES(ncm),
-            aliquota = VALUES(aliquota)
+                produto = VALUES(produto),
+                ncm = VALUES(ncm),
+                aliquota = IF(VALUES(aliquota) != '', VALUES(aliquota), aliquota)
         """, dados_para_inserir)
         progress_bar.setValue(80)
 
@@ -112,6 +113,8 @@ def enviar_tributacao(nome_banco, progress_bar):
         progress_bar.setValue(90)
 
         conexao.commit()
+        atualizar_aliquotas_e_resultado(nome_banco)
+
         progress_bar.setValue(100)
         mensagem_sucesso("Tributação enviada com sucesso!")
         progress_bar.setValue(0)
@@ -122,24 +125,3 @@ def enviar_tributacao(nome_banco, progress_bar):
         cursor.close()
         fechar_banco(conexao)
 
-def verificar_e_preencher_aliquotas(conexao, tela_pai=None):
-    try:
-        cursor = conexao.cursor()
-        cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
-        dados = cursor.fetchall()
-        cursor.close()
-
-        if dados:
-            msg = QMessageBox(tela_pai)
-            msg.setIcon(QMessageBox.Warning)
-            msg.setWindowTitle("Alíquotas Nulas")
-            msg.setText(f"Foram encontrados {len(dados)} produtos sem alíquota.")
-            msg.setInformativeText("Deseja preenchê-las agora?")
-            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-            resposta = msg.exec()
-
-            if resposta == QMessageBox.Yes:
-                tela = PopupAliquota(dados, conexao)
-                tela.exec()
-    except Exception as e:
-        mensagem_error(f"Erro ao verificar alíquotas nulas: {e}")

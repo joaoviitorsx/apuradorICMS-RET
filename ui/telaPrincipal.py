@@ -125,7 +125,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if mes == "Escolha o mês" or ano == "Escolha o ano":
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
-
+        
+        
         self.progress_bar.setValue(0)
         exportar_resultado(self.empresa_sem_espacos, mes, ano, self.progress_bar)
         self.progress_bar.setValue(0)
