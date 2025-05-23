@@ -20,7 +20,7 @@ async def atualizar_ncm(nome_banco):
         cursor.close()
         fechar_banco(conexao)
 
-async def atualizar_aliquota(nome_banco):
+async def atualizar_aliquota(nome_banco,periodo):
     print("Atualizando alíquotas com validação...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
@@ -35,16 +35,23 @@ async def atualizar_aliquota(nome_banco):
         cursor.execute(f"""
             UPDATE c170_clone n
             JOIN cadastro_tributacao c ON n.cod_item = c.codigo
-            SET n.aliquota = CONCAT(
-                REPLACE(FORMAT(
-                    CAST(REPLACE(REPLACE(c.{coluna_origem}, '%', ''), ',', '.') AS DECIMAL(5, 2)),
-                    2
-                ), '.', ','), '%'
-            )
-            WHERE (n.aliquota IS NULL OR n.aliquota = '')
-              AND c.{coluna_origem} REGEXP '^[0-9]+(,[0-9]{1,2})?%?$'
-              AND CAST(REPLACE(REPLACE(c.{coluna_origem}, '%', ''), ',', '.') AS DECIMAL(5,2)) <= 30
+            SET n.aliquota = c.{coluna_origem}
+            WHERE c.{coluna_origem} IN ('1.54%', '4.00%', '8.13%', 'ST', 'ISENTO')
         """)
+        print(f"{cursor.rowcount} registros atualizados com nova alíquota.")
+
+        cursor.execute("""
+            SELECT cod_item, aliquota FROM c170_clone
+            WHERE periodo = %s AND cod_item IN (
+                SELECT codigo FROM cadastro_tributacao
+                WHERE aliquota IN ('1.54%', '4.00%', '8.13%', 'ST', 'ISENTO')
+            )
+            LIMIT 10
+        """, (periodo,))
+        print("[DEBUG] c170_clone após atualização de alíquota:")
+        for linha in cursor.fetchall():
+            print(f" - Item: {linha[0]} | Alíquota: {linha[1]}")
+
         conexao.commit()
         print("Alíquotas válidas aplicadas à tabela c170_clone.")
 
@@ -55,7 +62,7 @@ async def atualizar_aliquota(nome_banco):
         cursor.close()
         fechar_banco(conexao)
 
-async def atualizar_aliquota_simples(nome_banco):
+async def atualizar_aliquota_simples(nome_banco, periodo):
     print("Iniciando atualização de alíquotas para Simples Nacional...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
@@ -64,10 +71,11 @@ async def atualizar_aliquota_simples(nome_banco):
         cursor.execute("""
             SELECT COUNT(*) FROM c170_clone c
             JOIN cadastro_fornecedores f ON f.cod_part = c.cod_part
-            WHERE f.simples = 'Sim'
+            WHERE c.periodo = %s
+              AND f.simples = 'Sim'
               AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
               AND CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) <= 20.00
-        """)
+        """, (periodo,))
         count = cursor.fetchone()[0]
         print(f"[DEBUG] Registros encontrados para ajuste: {count}")
 
@@ -82,12 +90,13 @@ async def atualizar_aliquota_simples(nome_banco):
                         CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00,
                         2
                     ), '.', ','), '%')
-                ELSE NULL  -- ou mantenha c.aliquota original, se preferir
+                ELSE c.aliquota
             END
-            WHERE f.simples = 'Sim'
+            WHERE c.periodo = %s
+              AND f.simples = 'Sim'
               AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
               AND CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) <= 20.00
-        """)
+        """, (periodo,))
         conexao.commit()
         print(f"Conclusão: {count} atualizados (caso tenham passado no filtro).")
     except Exception as e:

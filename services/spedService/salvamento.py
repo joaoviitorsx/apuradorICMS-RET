@@ -7,18 +7,6 @@ from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corri
     
 UNIDADE_PADRAO = "UN"
 
-def limpar_aliquota(valor):
-    if not valor:
-        return None
-    valor = valor.replace('%', '').replace(',', '.').strip()
-    try:
-        num = float(valor)
-        if 0 <= num <= 30:
-            return str(round(num, 2)).replace('.', ',') + '%'
-    except ValueError:
-        pass
-    return None
-
 async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
     linhas = conteudo.split('\n')
     print(f"[DEBUG] Iniciando processamento de {len(linhas)} linhas")
@@ -99,16 +87,14 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
                 partes += [None] * (38 - len(partes))
                 if len(partes) < 12: continue
 
-                print(f"[DEBUG LINHA C170]: {linha}")
-                print(f"[DEBUG RAW ALIQ] ICMS={partes[14]}, ST={partes[17]}, IPI={partes[23]}, PIS={partes[28]}, PIS_REAIS={partes[30]}, COFINS={partes[33]}, COFINS_REAIS={partes[35]}")
-                
                 if not num_doc:
                     print(f"[DEBUG CRÍTICO] num_doc indefinido antes do registro C170: linha={linha}")
                     continue
                 partes[10] = corrigir_cst_icms(partes[10])
+
                 partes[6] = truncar(corrigir_unidade(partes[6]), TAMANHOS_MAXIMOS['unid'])
                 partes[9] = corrigir_ind_mov(partes[9])
-
+                
                 partes[2] = truncar(partes[2], TAMANHOS_MAXIMOS['cod_item'])
                 partes[4] = truncar(partes[4], TAMANHOS_MAXIMOS['descr_compl'])
                 partes[12] = truncar(partes[12], TAMANHOS_MAXIMOS['cod_nat'])
@@ -224,7 +210,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
                         registro_ajustado[40] = int(registro_ajustado[40])
                     except ValueError:
                         registro_ajustado[40] = None
-                
+
                 lote_ajustado.append(registro_ajustado)
 
             try:
@@ -277,4 +263,3 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
         print("[FATAL] Erro durante o salvamento:", e)
         print(traceback.format_exc())
         return f"Erro geral ao salvar: {e}"
-

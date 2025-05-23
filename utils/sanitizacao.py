@@ -11,6 +11,21 @@ TAMANHOS_MAXIMOS = {
     'nome': 100,
 }
 
+def limpar_aliquota(valor):
+    if not valor:
+        return None
+    valor = str(valor).strip().replace('%', '').replace(',', '.')
+    try:
+        num = float(valor)
+        if num == 0:
+            return '0%'
+        return f"{num:.2f}%"
+    except ValueError:
+        valor_upper = valor.upper()
+        if valor_upper in ["ST", "ISENTO", "PAUTA"]:
+            return valor_upper
+        return None
+    
 def truncar(valor, limite):
     if valor is None:
         return None
@@ -203,3 +218,46 @@ def get_fallback_value_by_index(index):
 
 def calcular_periodo(dt_ini_0000):
     return f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
+
+def is_aliquota_valida(valor: str) -> bool:
+    if not isinstance(valor, str):
+        return False
+
+    padrao = r'^[0-2]?[0-9](,[0-9]{1,2})?%$'
+    if not re.match(padrao, valor):
+        return False
+
+    try:
+        num = float(valor.replace('%', '').replace(',', '.'))
+        return 0 <= num <= 30
+    except ValueError:
+        return False
+
+def atualizar_aliquotas_e_resultado(nome_banco):
+    import asyncio
+    from services.spedService.atualizacoes import atualizar_aliquota, atualizar_resultado
+    from db.conexao import conectar_banco, fechar_banco
+
+    async def _executar():
+        conexao = conectar_banco(nome_banco)
+        cursor = conexao.cursor()
+        cursor.execute("SELECT dt_ini FROM `0000` ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        cursor.close()
+        fechar_banco(conexao)
+
+        periodo = f"{row[0][2:4]}/{row[0][4:]}" if row else "00/0000"
+        print(f"[DEBUG] Período obtido para atualização: {periodo}")
+
+        await atualizar_aliquota(nome_banco, periodo)
+        await atualizar_resultado(nome_banco)
+
+    try:
+        if asyncio.get_event_loop().is_running():
+            asyncio.create_task(_executar())
+        else:
+            asyncio.run(_executar())
+    except Exception as e:
+        print(f"[ERRO] Falha ao atualizar alíquotas e resultados: {e}")
+
+
