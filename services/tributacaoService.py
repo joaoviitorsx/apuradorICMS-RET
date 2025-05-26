@@ -94,6 +94,11 @@ def enviar_tributacao(nome_banco, progress_bar):
                 ncm = VALUES(ncm),
                 aliquota = IF(VALUES(aliquota) != '', VALUES(aliquota), aliquota)
         """, dados_para_inserir)
+        
+        print(f"[DEBUG] {cursor.rowcount} linhas inseridas/atualizadas em cadastro_tributacao.")
+        cursor.execute("SELECT COUNT(*) FROM cadastro_tributacao")
+        print(f"[DEBUG] Total de registros em cadastro_tributacao: {cursor.fetchone()[0]}")
+
         progress_bar.setValue(80)
 
         cursor.execute("""
