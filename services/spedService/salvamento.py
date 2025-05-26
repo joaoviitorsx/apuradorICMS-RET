@@ -4,10 +4,12 @@ from utils.siglas import obter_sigla_estado
 from PySide6.QtCore import QMetaObject, Qt, QTimer
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,TAMANHOS_MAXIMOS, get_column_index, get_fallback_value, get_fallback_value_by_index,calcular_periodo, validar_estrutura_c170
-    
+from services.spedService.atualizacoes import atualizar_aliquota
+from db.conexao import conectar_banco, fechar_banco
+
 UNIDADE_PADRAO = "UN"
 
-async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
+async def salvar_no_banco_em_lote(conteudo, cursor, conexao, nome_banco, janela=None):
     linhas = conteudo.split('\n')
     print(f"[DEBUG] Iniciando processamento de {len(linhas)} linhas")
 
@@ -233,28 +235,33 @@ async def salvar_no_banco_em_lote(conteudo, cursor, nome_banco, janela=None):
                 contadores["erros"] += len(lote_ajustado)
                 print(f"[ERRO] Lote C170 {i}-{i+len(lote_ajustado)}: {e}")
 
-        print("[DEBUG] Iniciando verificação de produtos no cadastro_tributacao")
+                print("[DEBUG] Iniciando verificação de produtos no cadastro_tributacao")
         try:
             codigos_inseridos = set()
+            codigos_nulos = set()
             for reg in lote_c170:
                 cod_item = reg[3]
                 produto = reg[4]
                 ncm = next((r[7] for r in lote_0200 if r[1] == cod_item), None)
 
-                if cod_item in codigos_inseridos:
-                    continue
-                
-                cursor.execute("SELECT 1 FROM cadastro_tributacao WHERE codigo = %s LIMIT 1", (cod_item,))
-                if not cursor.fetchone():
+                cursor.execute("SELECT aliquota FROM cadastro_tributacao WHERE codigo = %s LIMIT 1", (cod_item,))
+                resultado = cursor.fetchone()
+
+                if resultado is None:
                     cursor.execute("""
-                        INSERT INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
-                        VALUES (%s, %s, %s, NULL)
+                        INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm)
+                        VALUES (%s, %s, %s)
                     """, (cod_item, produto, ncm))
                     codigos_inseridos.add(cod_item)
 
-            print(f"[DEBUG] {len(codigos_inseridos)} produtos adicionados ao cadastro_tributacao com aliquota NULL")
+                elif resultado[0] is None or str(resultado[0]).strip() == "":
+                    codigos_nulos.add(cod_item)
+
+            conexao.commit()
+            print(f"[DEBUG] {len(codigos_inseridos)} produtos novos adicionados ao cadastro_tributacao.")
+            print(f"[DEBUG] {len(codigos_nulos)} produtos já existentes com aliquota NULL.")
         except Exception as e:
-            print(f"[ERRO] Falha ao popular cadastro_tributacao: {e}")
+            print(f"[ERRO] Falha ao verificar/atualizar cadastro_tributacao: {e}")
 
         print(f"[FINAL] Processamento concluído: {contadores}")
         return f"Processado com sucesso. {contadores['salvos']} itens salvos, {contadores['erros']} com erro."

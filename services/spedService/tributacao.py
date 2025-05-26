@@ -62,29 +62,21 @@ async def atualizar_cadastro_tributacao(nome_banco):
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
-    insert_query = """
-        INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm)
-        SELECT 
-            c170nova.cod_item, 
-            c170nova.descr_compl, 
-            c170nova.cod_ncm
-        FROM c170nova
-        WHERE NOT EXISTS (
-            SELECT 1 
-            FROM cadastro_tributacao 
-            WHERE codigo = c170nova.cod_item
-        )
-    """
     try:
-        cursor.execute(insert_query)
-        linhas_afetadas = cursor.rowcount
+        cursor.execute("""
+            INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm)
+            SELECT DISTINCT c.cod_item, c.descr_compl, c.ncm
+            FROM c170_clone c
+            WHERE NOT EXISTS (
+                SELECT 1 FROM cadastro_tributacao ct
+                WHERE ct.codigo = c.cod_item
+            )
+        """)
+        novos = cursor.rowcount
         conexao.commit()
-        print(f"{linhas_afetadas} registros inseridos em cadastro_tributacao.")
-    except Exception as e:
-        conexao.rollback()
-        print(f"Erro ao atualizar cadastro_tributacao: {e}")
-    finally:
-        try:
+        print(f"[OK] {novos} produtos novos inseridos no cadastro_tributacao.")
+
+        if novos > 0:
             print("[SANITIZAÇÃO] Limpando alíquotas inválidas...")
             cursor.execute("""
                 UPDATE cadastro_tributacao
@@ -95,9 +87,13 @@ async def atualizar_cadastro_tributacao(nome_banco):
             """)
             conexao.commit()
             print("[OK] Alíquotas inválidas foram resetadas para NULL.")
-        except Exception as e:
-            conexao.rollback()
-            print(f"[ERRO] ao limpar alíquotas inválidas: {e}")
-        finally:
-            cursor.close()
-            fechar_banco(conexao)
+        else:
+            print("[INFO] Nenhum produto novo inserido. Sanitização de alíquotas não necessária.")
+
+    except Exception as e:
+        conexao.rollback()
+        print(f"[ERRO] Falha ao verificar/atualizar cadastro_tributacao: {e}")
+    finally:
+        cursor.close()
+        fechar_banco(conexao)
+

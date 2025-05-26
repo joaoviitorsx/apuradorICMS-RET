@@ -166,7 +166,7 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
             conexao = conectar_banco(nome_banco)
             cursor = conexao.cursor()
 
-            mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, nome_banco)
+            mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, conexao, nome_banco)
 
             conexao.commit()
             cursor.close()

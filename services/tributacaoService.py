@@ -125,3 +125,33 @@ def enviar_tributacao(nome_banco, progress_bar):
         cursor.close()
         fechar_banco(conexao)
 
+def atualizar_aliquota_c170_clone(nome_banco, periodo=None):
+    print("[EXPORTAÇÃO] Atualizando alíquotas na c170_clone com base em cadastro_tributacao...")
+    conexao = conectar_banco(nome_banco)
+    cursor = conexao.cursor()
+    try:
+        if periodo:
+            cursor.execute("""
+                UPDATE c170_clone c
+                JOIN cadastro_tributacao t ON c.cod_item = t.codigo
+                SET c.aliquota = t.aliquota
+                WHERE t.aliquota IS NOT NULL 
+                  AND TRIM(t.aliquota) <> '' 
+                  AND c.periodo = %s
+            """, (periodo,))
+        else:
+            cursor.execute("""
+                UPDATE c170_clone c
+                JOIN cadastro_tributacao t ON c.cod_item = t.codigo
+                SET c.aliquota = t.aliquota
+                WHERE t.aliquota IS NOT NULL AND TRIM(t.aliquota) <> ''
+            """)
+        conexao.commit()
+        print("[EXPORTAÇÃO] Alíquotas atualizadas com sucesso na c170_clone.")
+    except Exception as e:
+        conexao.rollback()
+        print(f"[ERRO] ao atualizar alíquotas na c170_clone: {e}")
+    finally:
+        cursor.close()
+        fechar_banco(conexao)
+

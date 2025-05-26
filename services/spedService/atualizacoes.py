@@ -20,44 +20,39 @@ async def atualizar_ncm(nome_banco):
         cursor.close()
         fechar_banco(conexao)
 
-async def atualizar_aliquota(nome_banco,periodo):
-    print("Atualizando alíquotas com validação...")
+async def atualizar_aliquota(nome_banco):
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
-
+    
     try:
-        cursor.execute("SELECT dt_ini FROM `0000` ORDER BY id DESC LIMIT 1")
-        dt_ini = cursor.fetchone()[0]
-        ano = int(dt_ini[4:]) if dt_ini and len(dt_ini) >= 6 else 0
-        coluna_origem = "aliquota" if ano >= 2024 else "aliquota_antiga"
-        print(f"[DEBUG] Coluna usada para alíquota: {coluna_origem}")
-
-        cursor.execute(f"""
-            UPDATE c170_clone n
-            JOIN cadastro_tributacao c ON n.cod_item = c.codigo
-            SET n.aliquota = c.{coluna_origem}
-            WHERE c.{coluna_origem} IN ('1.54%', '4.00%', '8.13%', 'ST', 'ISENTO')
-        """)
-        print(f"{cursor.rowcount} registros atualizados com nova alíquota.")
+        cursor.execute("SHOW COLUMNS FROM c170 LIKE 'aliquota'")
+        column_info = cursor.fetchone()
+        max_length = int(column_info[1].split('(')[1].split(')')[0])
 
         cursor.execute("""
-            SELECT cod_item, aliquota FROM c170_clone
-            WHERE periodo = %s AND cod_item IN (
-                SELECT codigo FROM cadastro_tributacao
-                WHERE aliquota IN ('1.54%', '4.00%', '8.13%', 'ST', 'ISENTO')
-            )
-            LIMIT 10
-        """, (periodo,))
-        print("[DEBUG] c170_clone após atualização de alíquota:")
-        for linha in cursor.fetchall():
-            print(f" - Item: {linha[0]} | Alíquota: {linha[1]}")
+            SELECT dt_ini FROM `0000`
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+        dt_ini = cursor.fetchone()[0]
+        ano = int(dt_ini[4:]) if dt_ini else 0
+        print(f"[DEBUG] dt_ini: {dt_ini}, ano: {ano}")
 
+        coluna = "aliquota" if ano >= 2024 else "aliquota_antiga"
+
+        cursor.execute(f"""
+            UPDATE c170 n
+            JOIN cadastro_tributacao c ON n.cod_item = c.codigo
+            SET n.aliquota = LEFT(c.{coluna}, {max_length})
+            WHERE n.aliquota IS NULL OR TRIM(n.aliquota) = ''
+        """)
         conexao.commit()
-        print("Alíquotas válidas aplicadas à tabela c170_clone.")
+        print(f"[OK] c170 atualizada com coluna '{coluna}' de cadastro_tributacao.")
 
     except Exception as err:
-        print(f"Erro ao atualizar alíquotas: {err}")
+        print(f"[ERRO] Falha ao atualizar alíquotas na tabela c170: {err}")
         conexao.rollback()
+    
     finally:
         cursor.close()
         fechar_banco(conexao)

@@ -249,7 +249,7 @@ def atualizar_aliquotas_e_resultado(nome_banco):
         periodo = f"{row[0][2:4]}/{row[0][4:]}" if row else "00/0000"
         print(f"[DEBUG] Período obtido para atualização: {periodo}")
 
-        await atualizar_aliquota(nome_banco, periodo)
+        await atualizar_aliquota(nome_banco)
         await atualizar_resultado(nome_banco)
 
     try:
@@ -265,5 +265,6 @@ def atualizar_aliquotas_e_resultado(nome_banco):
         new_loop.close()
     except Exception as e:
         print(f"[ERRO] Falha ao atualizar alíquotas e resultados: {e}")
+
 
 

@@ -8,6 +8,7 @@ class Mensageiro(QObject):
 mensageiro = Mensageiro()
 
 async def comparar_adicionar_atualizar_fornecedores(nome_banco):
+    print("[DEBUG] Iniciando comparação e atualização de fornecedores...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
