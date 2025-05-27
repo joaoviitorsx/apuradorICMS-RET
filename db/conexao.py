@@ -3,7 +3,7 @@ from mysql.connector import Error
 
 HOST = 'localhost'
 USUARIO = 'root'
-SENHA = '1234'
+SENHA = '12345'
 BANCO = 'empresas_db'
 
 def conectar_banco():

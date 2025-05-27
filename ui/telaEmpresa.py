@@ -3,7 +3,7 @@ from ui.cadastroEmpresa import EmpresaCadastro
 from ui.telaPrincipal import MainWindow
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectar_banco, fechar_banco, tabela_empresa
 from db.criarTabelas import criar_tabelas_principais
 
 class WorkerInicializacao(QtCore.QThread):
@@ -14,12 +14,14 @@ class WorkerInicializacao(QtCore.QThread):
         try:
             conexao = conectar_banco()
             if conexao:
+                tabela_empresa(conexao)
+                print("[DEBUG] Banco de dados preparado com sucesso!")
                 criar_tabelas_principais()
+                print("[DEBUG] Tabelas criadas com sucesso.")
                 fechar_banco(conexao)
             self.terminado.emit()
         except Exception as e:
             self.erro.emit(str(e))
-
 
 class WorkerCarregarEmpresas(QtCore.QThread):
     empresas_carregadas = QtCore.Signal(list)
@@ -157,8 +159,8 @@ class EmpresaWindow(QtWidgets.QWidget):
         except Exception as e:
             mensagem_error(f"Erro ao abrir a empresa: {e}")
 
-    def cadastrar_empresa(self):
-        self.empresa_cadastro = EmpresaCadastro(self.banco_empresas)
+    def cadastrar_empresa(self, nome_banco):
+        self.empresa_cadastro = EmpresaCadastro(nome_banco)
         usar_icone(self.empresa_cadastro)
         self.empresa_cadastro.showMaximized()
         self.close()
