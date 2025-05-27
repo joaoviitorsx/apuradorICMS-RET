@@ -12,41 +12,27 @@ from utils.sanitizacao import is_aliquota_valida, atualizar_aliquotas_e_resultad
 from services.spedService.atualizacoes import atualizar_aliquota, atualizar_resultado
 from services.tributacaoService import atualizar_aliquota_c170_clone
 
-def exportar_resultado(nome_banco, mes, ano, progress_bar):
-    print(f"[DEBUG] Exportando resultado para {mes}/{ano} no banco {nome_banco}")
-
+def exportar_resultado(empresa_id, mes, ano, progress_bar):
+    print(f"[DEBUG] Exportando resultado para {mes}/{ano} para empresa_id={empresa_id}")
     try:
         progress_bar.setValue(5)
         periodo = f"{mes}/{ano}"
 
-        conexao = conectar_banco(nome_banco)
+        conexao = conectar_banco()
         if not conexao:
             mensagem_error("Não foi possível conectar ao banco de dados.")
             return
         cursor = conexao.cursor()
 
-        atualizar_aliquota_c170_clone(nome_banco, periodo)
-
-        cursor.execute("SELECT COUNT(*) FROM c170_clone WHERE aliquota IS NOT NULL AND TRIM(aliquota) <> ''")
-        print("[DEBUG] Registros com aliquota preenchida após atualização:", cursor.fetchone()[0])
-
-        cursor.execute("SELECT * FROM c170_clone LIMIT 10")
-        colunas_clone = [desc[0] for desc in cursor.description]
-        print("[DEBUG] Primeiros registros em c170_clone:")
-        for row in cursor.fetchall():
-            print(dict(zip(colunas_clone, row)))
-
-        cursor.execute("SELECT * FROM c170_clone")
-        colunas_clone = [desc[0] for desc in cursor.description]
-        print("[DEBUG] TODOS os registros em c170_clone:")
-        for row in cursor.fetchall():
-            print(dict(zip(colunas_clone, row)))
-
-        cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
+        cursor.execute("""
+            SELECT codigo, produto, ncm 
+            FROM cadastro_tributacao 
+            WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
+        """, (empresa_id,))
         produtos_nulos = cursor.fetchall()
 
         if produtos_nulos:
-            popup = PopupAliquota(produtos_nulos, nome_banco)
+            popup = PopupAliquota(produtos_nulos, empresa_id)
             resultado = popup.exec()
             if resultado != 1:
                 mensagem_aviso("Preenchimento de alíquotas cancelado.")
@@ -56,8 +42,8 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
             SELECT c.*, f.nome, f.cnpj 
             FROM c170_clone c 
             INNER JOIN `0150` f ON f.cod_part = c.cod_part 
-            WHERE c.periodo = %s
-        """, (periodo,))
+            WHERE c.periodo = %s AND c.empresa_id = %s AND f.empresa_id = %s
+        """, (periodo, empresa_id, empresa_id))
         dados = cursor.fetchall()
 
         if not dados:
@@ -73,23 +59,16 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
         if 'aliquota' in df.columns:
             df['aliquota'] = df['aliquota'].apply(lambda x: x if is_aliquota_valida(x) else '')
 
-        cursor.execute("SELECT cnpj FROM `0000` ORDER BY id DESC LIMIT 1")
-        cnpj = cursor.fetchone()[0]
-        cursor.execute("SELECT periodo, dt_ini, dt_fin FROM `0000` WHERE periodo = %s LIMIT 1", (periodo,))
+        cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (empresa_id,))
+        nome_empresa_result = cursor.fetchone()
+        nome_empresa = nome_empresa_result[0] if nome_empresa_result else "empresa"
+
+        cursor.execute("SELECT periodo, dt_ini, dt_fin FROM `0000` WHERE empresa_id = %s AND periodo = %s LIMIT 1", (empresa_id, periodo))
         resultado = cursor.fetchone()
         if not resultado:
             mensagem_error("Período não encontrado na tabela 0000.")
             return
         _, dt_ini, dt_fin = resultado
-
-        conexao_emp = conectar_banco("empresas_db")
-        cursor_emp = conexao_emp.cursor()
-        cursor_emp.execute("SELECT razao_social FROM empresas WHERE LEFT(cnpj, 8) = LEFT(%s, 8) LIMIT 1", (cnpj,))
-        razao_result = cursor_emp.fetchone()
-        if not razao_result:
-            mensagem_error("Empresa não encontrada na base principal.")
-            return
-        nome_empresa = razao_result[0]
 
         sugestao_nome = f"{ano}-{mes}-{nome_empresa}.xlsx"
         caminho_arquivo, _ = QFileDialog.getSaveFileName(None, "Salvar Resultado", sugestao_nome, "Planilhas Excel (*.xlsx)")
@@ -120,13 +99,9 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
 
     except Exception as e:
         mensagem_error(f"Erro ao exportar: {e}")
-
     finally:
         try:
             cursor.close()
             fechar_banco(conexao)
-            cursor_emp.close()
-            fechar_banco(conexao_emp)
         except:
             pass
-
