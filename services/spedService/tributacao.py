@@ -57,21 +57,22 @@ async def criar_e_preencher_c170nova(nome_banco):
     fechar_banco(conexao)
     print("c170nova preenchida com sucesso.")
 
-async def atualizar_cadastro_tributacao(nome_banco):
+async def atualizar_cadastro_tributacao(nome_banco, empresa_id):
     print("Atualizando cadastro_tributacao...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
 
     try:
         cursor.execute("""
-            INSERT IGNORE INTO cadastro_tributacao (codigo, produto, ncm)
-            SELECT DISTINCT c.cod_item, c.descr_compl, c.ncm
+            INSERT IGNORE INTO cadastro_tributacao (empresa_id, codigo, produto, ncm)
+            SELECT %s, c.cod_item, c.descr_compl, c.ncm
             FROM c170_clone c
             WHERE NOT EXISTS (
                 SELECT 1 FROM cadastro_tributacao ct
-                WHERE ct.codigo = c.cod_item
+                WHERE ct.codigo = c.cod_item AND ct.empresa_id = %s
             )
-        """)
+        """, (empresa_id, empresa_id))
+
         novos = cursor.rowcount
         conexao.commit()
         print(f"[OK] {novos} produtos novos inseridos no cadastro_tributacao.")
@@ -84,7 +85,8 @@ async def atualizar_cadastro_tributacao(nome_banco):
                 WHERE
                     TRIM(aliquota) NOT REGEXP '^[0-2]?[0-9](,[0-9]{1,2})?%$'
                     OR CAST(REPLACE(REPLACE(aliquota, '%', ''), ',', '.') AS DECIMAL(5,2)) > 30
-            """)
+                    AND empresa_id = %s
+            """, (empresa_id,))
             conexao.commit()
             print("[OK] Alíquotas inválidas foram resetadas para NULL.")
         else:
@@ -96,4 +98,3 @@ async def atualizar_cadastro_tributacao(nome_banco):
     finally:
         cursor.close()
         fechar_banco(conexao)
-
