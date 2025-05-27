@@ -3,7 +3,11 @@ import traceback
 from utils.siglas import obter_sigla_estado
 from PySide6.QtCore import QMetaObject, Qt, QTimer
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,TAMANHOS_MAXIMOS, get_column_index, get_fallback_value, get_fallback_value_by_index,calcular_periodo, validar_estrutura_c170
+from utils.sanitizacao import (
+    truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,
+    TAMANHOS_MAXIMOS, get_column_index, get_fallback_value,
+    get_fallback_value_by_index, calcular_periodo, validar_estrutura_c170
+)
 from services.spedService.atualizacoes import atualizar_aliquota
 from db.conexao import conectar_banco, fechar_banco
 
@@ -28,8 +32,22 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
             print(f"[OK] {descricao}: {len(lote)} registros inseridos.")
             contadores["salvos"] += len(lote)
         except Exception as e:
-            print(f"[ERRO] {descricao}: {e}")
-            contadores["erros"] += len(lote)
+            if "Duplicate entry" in str(e):
+                print(f"[WARN] Ignorando entradas duplicadas em {descricao}")
+                salvos = 0
+                for item in lote:
+                    try:
+                        cursor.execute(sql, item)
+                        salvos += 1
+                    except Exception as e_item:
+                        if "Duplicate entry" not in str(e_item):
+                            print(f"[ERRO] Falha ao inserir item em {descricao}: {e_item}")
+                            contadores["erros"] += 1
+                print(f"[PARCIAL] {descricao}: {salvos}/{len(lote)} registros inseridos após tratar duplicidades.")
+                contadores["salvos"] += salvos
+            else:
+                print(f"[ERRO] Falha ao inserir {descricao}: {e}")
+                contadores["erros"] += len(lote)
 
     try:
         for linha in linhas:
@@ -73,12 +91,13 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                 contadores["C100"] += 1
 
             elif linha.startswith("|C170|"):
-                partes += [None] * (38 - len(partes))
+                partes += [None] * (39 - len(partes))
                 if len(partes) < 12: continue
 
                 if not num_doc:
                     print(f"[DEBUG CRÍTICO] num_doc indefinido antes do registro C170: linha={linha}")
                     continue
+                
                 partes[10] = corrigir_cst_icms(partes[10])
                 partes[6] = truncar(corrigir_unidade(partes[6]), TAMANHOS_MAXIMOS['unid'])
                 partes[9] = corrigir_ind_mov(partes[9])
@@ -92,7 +111,52 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                     continue
 
                 dados = [
-                    calcular_periodo(dt_ini_0000), *partes[:39], None, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id
+                    calcular_periodo(dt_ini_0000),  # 1 periodo
+                    partes[0],                      # 2 reg
+                    partes[1],                      # 3 num_item
+                    partes[2],                      # 4 cod_item
+                    partes[4],                      # 5 descr_compl
+                    partes[5],                      # 6 qtd
+                    partes[6],                      # 7 unid
+                    partes[7],                      # 8 vl_item
+                    partes[8],                      # 9 vl_desc
+                    partes[9],                      # 10 ind_mov
+                    partes[10],                     # 11 cst_icms
+                    partes[11],                     # 12 cfop
+                    partes[12],                     # 13 cod_nat
+                    partes[13],                     # 14 vl_bc_icms
+                    partes[14],                     # 15 aliq_icms
+                    partes[15],                     # 16 vl_icms
+                    partes[16],                     # 17 vl_bc_icms_st
+                    partes[17],                     # 18 aliq_st
+                    partes[18],                     # 19 vl_icms_st
+                    partes[19],                     # 20 ind_apur
+                    partes[20],                     # 21 cst_ipi
+                    partes[21],                     # 22 cod_enq
+                    partes[22],                     # 23 vl_bc_ipi
+                    partes[23],                     # 24 aliq_ipi
+                    partes[24],                     # 25 vl_ipi
+                    partes[25],                     # 26 cst_pis
+                    partes[26],                     # 27 vl_bc_pis
+                    partes[27],                     # 28 aliq_pis
+                    partes[28],                     # 29 quant_bc_pis
+                    partes[29],                     # 30 aliq_pis_reais
+                    partes[30],                     # 31 vl_pis
+                    partes[31],                     # 32 cst_cofins
+                    partes[32],                     # 33 vl_bc_cofins
+                    partes[33],                     # 34 aliq_cofins
+                    partes[34],                     # 35 quant_bc_cofins
+                    partes[35],                     # 36 aliq_cofins_reais
+                    partes[36],                     # 37 vl_cofins
+                    partes[37],                     # 38 cod_cta
+                    partes[38],                     # 39 vl_abat_nt
+                    None,                           # 40 id_c100
+                    filial,                         # 41 filial
+                    ind_oper,                       # 42 ind_oper
+                    cod_part,                       # 43 cod_part
+                    num_doc,                        # 44 num_doc
+                    chv_nfe,                        # 45 chv_nfe
+                    empresa_id                      # 46 empresa_id
                 ]
 
                 if len(dados) != 46:
@@ -137,6 +201,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
 
         for i in range(0, len(lote_c170), 100):
             lote = lote_c170[i:i+100]
+            print(f"[DEBUG] Tentando inserir lote C170 {i}-{i+len(lote)}, primeiro registro: {lote[0][:5]}...")
             try:
                 cursor.executemany("""
                     INSERT INTO c170 (
@@ -146,11 +211,20 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                         cst_pis, vl_bc_pis, aliq_pis, quant_bc_pis, aliq_pis_reais, vl_pis, cst_cofins,
                         vl_bc_cofins, aliq_cofins, quant_bc_cofins, aliq_cofins_reais, vl_cofins, cod_cta,
                         vl_abat_nt, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                             %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s
+                    )
                 """, lote)
                 contadores["salvos"] += len(lote)
+
+                cursor.execute("SELECT COUNT(*) FROM c170 WHERE periodo = %s AND empresa_id = %s",
+                               (calcular_periodo(dt_ini_0000), empresa_id))
+                total_registros = cursor.fetchone()[0]
+                print(f"[DEBUG] Total de registros em c170 após inserção: {total_registros}")
             except Exception as e:
                 contadores["erros"] += len(lote)
                 print(f"[ERRO] Falha no lote C170 {i}-{i+len(lote)}: {e}")

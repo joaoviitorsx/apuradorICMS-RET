@@ -20,7 +20,7 @@ async def criar_e_preencher_c170nova(empresa_id):
     query = f"""
         SELECT DISTINCT c.cod_item, c.periodo, c.reg, c.num_item, c.descr_compl,
                c.qtd, c.unid, c.vl_item, c.vl_desc, c.cfop, c.id_c100,
-               c.filial, c.ind_oper, c.cod_part, c.num_doc, c.chv_nfe
+               c.filial, c.ind_oper, c.cod_part, c.num_doc, c.chv_nfe, c.empresa_id
         FROM c170 c
         LEFT JOIN c170nova n ON c.cod_item = n.cod_item AND c.empresa_id = n.empresa_id
         WHERE c.empresa_id = %s
@@ -40,10 +40,9 @@ async def criar_e_preencher_c170nova(empresa_id):
         INSERT IGNORE INTO c170nova (
             cod_item, periodo, reg, num_item, descr_compl, qtd, unid, vl_item, vl_desc,
             cfop, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
-    dados_com_empresa = [linha + (empresa_id,) for linha in dados]
-    cursor.executemany(insert_query, dados_com_empresa)
+    cursor.executemany(insert_query, dados)
     conexao.commit()
 
     cursor.execute("""

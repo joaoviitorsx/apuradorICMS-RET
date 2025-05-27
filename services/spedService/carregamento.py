@@ -54,7 +54,7 @@ def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, jan
             mensageiro.sinal_sucesso.emit(mensagem_final)
 
             print("[DEBUG] Verificando alíquotas nulas")
-            conexao = conectar_banco(empresa_id)
+            conexao = conectar_banco()
             if conexao:
                 print("[DEBUG] Conexão com o banco estabelecida")
                 cursor = conexao.cursor()
@@ -161,7 +161,7 @@ async def processar_arquivo(caminho, empresa_id, progress_bar, label_arquivo, in
 
             conteudo_processado = process_data(conteudo)
 
-            conexao = conectar_banco(empresa_id)
+            conexao = conectar_banco()
             cursor = conexao.cursor()
 
             mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, conexao, empresa_id)

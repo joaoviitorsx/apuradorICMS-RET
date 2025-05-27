@@ -105,8 +105,6 @@ def enviar_tributacao(empresa_id, progress_bar):
         progress_bar.setValue(90)
         conexao.commit()
 
-        atualizar_aliquotas_e_resultado(empresa_id)
-
         progress_bar.setValue(100)
         mensagem_sucesso("Tributação enviada com sucesso!")
         progress_bar.setValue(0)
