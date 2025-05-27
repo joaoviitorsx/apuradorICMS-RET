@@ -6,14 +6,13 @@ from PySide6.QtWidgets import QFileDialog
 from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
 class PopupAliquota(QtWidgets.QDialog):
-    def __init__(self, dados, nome_banco, parent=None):
-        super().__init__()
-        self.nome_banco = nome_banco
+    def __init__(self, dados, empresa_id, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("Preencher Alíquotas Nulas")
         self.setGeometry(300, 150, 900, 600)
 
-        self.dados = dados
-        self.nome_banco = nome_banco
+        self.dados = dados              # Lista de (codigo, produto, ncm)
+        self.empresa_id = empresa_id    # ID da empresa
         self.aliquotas = ["1.54%", "4.00%", "8.13%", "ST", "ISENTO"]
 
         self._setup_ui()
@@ -97,7 +96,7 @@ class PopupAliquota(QtWidgets.QDialog):
         """)
 
     def salvar_todas(self):
-        conexao = conectar_banco(self.nome_banco)
+        conexao = conectar_banco()
         if not conexao:
             mensagem_error("Erro ao conectar ao banco de dados.")
             return
@@ -110,24 +109,16 @@ class PopupAliquota(QtWidgets.QDialog):
                     mensagem_error(f"Alíquota inválida para o código {codigo}: {aliquota}")
                     return
                 cursor.execute("""
-                    UPDATE cadastro_tributacao SET aliquota = %s
-                    WHERE codigo = %s
-                """, (aliquota, codigo))
+                    UPDATE cadastro_tributacao 
+                    SET aliquota = %s 
+                    WHERE codigo = %s AND empresa_id = %s
+                """, (aliquota, codigo, self.empresa_id))
+
             conexao.commit()
             mensagem_sucesso("Alíquotas salvas com sucesso!")
 
-            cursor.execute("""
-                SELECT codigo, aliquota FROM cadastro_tributacao
-                WHERE codigo IN (%s)
-            """ % ",".join(["%s"] * self.tabela.rowCount()),
-                [self.tabela.item(row, 0).text() for row in range(self.tabela.rowCount())]
-            )
-            print("[DEBUG] Aliquotas salvas no cadastro_tributacao:")
-            for linha in cursor.fetchall():
-                print(f" - Código: {linha[0]} | Alíquota: {linha[1]}")
-
             print("[DEBUG] Chamando atualizar_aliquotas_e_resultado...")
-            atualizar_aliquotas_e_resultado(self.nome_banco)
+            atualizar_aliquotas_e_resultado(self.empresa_id)
             print("[DEBUG] Finalizado atualizar_aliquotas_e_resultado.")
 
             self.accept()
