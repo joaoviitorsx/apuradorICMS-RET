@@ -5,13 +5,11 @@ import re
 from db.conexao import conectar_banco, tabela_empresa
 
 class EmpresaCadastro(QtWidgets.QWidget):
-    def __init__(self, banco_empresas):
+    def __init__(self):
         super().__init__()
         self.setWindowTitle('Apurado de ICMS - Cadastro de Empresas')
         self.setGeometry(200, 200, 900, 700)
         self.setStyleSheet('background-color: #030d18;')
-
-        self.banco_empresas = banco_empresas
 
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.setContentsMargins(20, 20, 20, 20)
@@ -77,23 +75,18 @@ class EmpresaCadastro(QtWidgets.QWidget):
                 background-color: #005588;
             }
         """
-    
+
     def cadastrar_empresa(self):
         cnpj = self.cnpj_input.text().strip()
         razao_social = self.razao_social_input.text().strip()
 
         cnpj_numeros = re.sub(r'\D', '', cnpj)
-        razao_formatada = razao_social.replace(" ", "_")
 
         if not razao_social or len(cnpj) != 18:
             mensagem_error("Preencha todos os campos corretamente.")
             return
 
-        if re.match(r'^[\d_]', razao_formatada) or not re.match(r'^[a-zA-Z0-9_]+$', razao_formatada):
-            mensagem_error("Razão Social inválida para nome de banco.")
-            return
-        
-        self.worker = CadastroEmpresaWorker(self.banco_empresas, cnpj_numeros, razao_social)
+        self.worker = CadastroEmpresaWorker(cnpj_numeros, razao_social)
         self.worker.cadastro_finalizado.connect(self.cadastro_sucesso)
         self.worker.erro_ocorrido.connect(self.cadastro_erro)
         self.worker.start()
@@ -116,18 +109,16 @@ class CadastroEmpresaWorker(QtCore.QThread):
     cadastro_finalizado = QtCore.Signal(str)
     erro_ocorrido = QtCore.Signal(str)
 
-    def __init__(self, banco, cnpj, razao_social):
+    def __init__(self, cnpj, razao_social):
         super().__init__()
-        self.banco = banco
         self.cnpj = cnpj
         self.razao = razao_social
 
     def run(self):
         try:
-            conexao = conectar_banco(self.banco)
+            conexao = conectar_banco()
             tabela_empresa(conexao)
             cursor = conexao.cursor()
-            cursor.execute(f"USE {self.banco}")
             cursor.execute("INSERT INTO empresas (cnpj, razao_social) VALUES (%s, %s)", (self.cnpj, self.razao))
             conexao.commit()
             cursor.close()

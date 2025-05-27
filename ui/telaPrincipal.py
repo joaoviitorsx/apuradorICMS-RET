@@ -5,15 +5,16 @@ from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import exportar_resultado
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
+
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, empresa):
+    def __init__(self, empresa, empresa_id):
         super().__init__()
         self.setWindowTitle(f'Apurado de ICMS Varejo - Assertivus Contábil - {empresa}')
         self.setGeometry(200, 200, 900, 700)
         self.setStyleSheet('background-color: #030d18;')
 
-        self.empresa = empresa
-        self.empresa_sem_espacos = self.empresa.replace(" ", "_")
+        self.empresa = empresa              # Nome da empresa (texto)
+        self.empresa_id = empresa_id        # ID único no banco
 
         self.central_widget = QtWidgets.QWidget()
         self.setCentralWidget(self.central_widget)
@@ -42,9 +43,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.frame_db = QtWidgets.QGroupBox('Empresa')
         self.frame_layout = QtWidgets.QVBoxLayout(self.frame_db)
 
-        self.label_nome_banco = QtWidgets.QLabel(f'{self.empresa}')
-        self.label_nome_banco.setStyleSheet('font-size: 20px; font-weight: bold; color: #ffffff; font-family: Arial;')
-        self.frame_layout.addWidget(self.label_nome_banco)
+        self.label_empresa = QtWidgets.QLabel(f'{self.empresa} (ID: {self.empresa_id})')
+        self.label_empresa.setStyleSheet('font-size: 20px; font-weight: bold; color: #ffffff; font-family: Arial;')
+        self.frame_layout.addWidget(self.label_empresa)
 
         self.layout.addWidget(self.frame_db)
 
@@ -77,11 +78,11 @@ class MainWindow(QtWidgets.QMainWindow):
             botao_frame.addWidget(btn)
 
     def _enviar_tributacao(self):
-        enviar_tributacao(self.empresa_sem_espacos, self.progress_bar)
+        enviar_tributacao(self.empresa_id, self.progress_bar)
 
     def _processar_sped(self):
         self.progress_bar.setValue(0)
-        iniciar_processamento_sped(self.empresa_sem_espacos, self.progress_bar, self.label_arquivo, self)
+        iniciar_processamento_sped(self.empresa_id, self.progress_bar, self.label_arquivo, self)
 
     def _criar_seletor_mes_ano(self):
         mes_frame = QtWidgets.QHBoxLayout()
@@ -117,16 +118,13 @@ class MainWindow(QtWidgets.QMainWindow):
         mes_frame.addWidget(btn_baixar_tabela)
 
     def _baixar_tabela(self):
-        from services.exportacaoService import exportar_resultado
-
         mes = self.mes_var.currentText()
         ano = self.ano_var.currentText()
 
         if mes == "Escolha o mês" or ano == "Escolha o ano":
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
-        
-        
+
         self.progress_bar.setValue(0)
-        exportar_resultado(self.empresa_sem_espacos, mes, ano, self.progress_bar)
+        exportar_resultado(self.empresa_id, mes, ano, self.progress_bar)
         self.progress_bar.setValue(0)

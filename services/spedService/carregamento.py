@@ -21,7 +21,7 @@ class Mensageiro(QObject):
     sinal_erro = Signal(str)
     sinal_verificar_aliquotas = Signal(list)
 
-def tratar_aliquotas_nulas(produtos_nulos, nome_banco, janela):
+def tratar_aliquotas_nulas(produtos_nulos, empresa_id, janela):
     box = QMessageBox(janela)
     box.setIcon(QMessageBox.Warning)
     box.setWindowTitle("Alíquotas Nulas")
@@ -31,23 +31,21 @@ def tratar_aliquotas_nulas(produtos_nulos, nome_banco, janela):
     resposta = box.exec()
 
     if resposta == QMessageBox.Yes:
-        tela = PopupAliquota(produtos_nulos, nome_banco, janela)
+        tela = PopupAliquota(produtos_nulos, empresa_id, janela)
         resultado = tela.exec()
 
         if resultado == 1:
             print("[DEBUG] Atualizando c170_clone com novas alíquotas preenchidas...")
-            atualizar_aliquotas_e_resultado(nome_banco)
+            atualizar_aliquotas_e_resultado(empresa_id)
 
 
-def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
+def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
     print(f"[DEBUG] Iniciando thread de processamento SPED com {len(caminhos)} arquivo(s)")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    result, mensagem_final = loop.run_until_complete(
-        processar_sped(nome_banco, progress_bar, label_arquivo, caminhos)
-    )
-
+    result, mensagem_final = loop.run_until_complete(processar_sped(empresa_id, progress_bar, label_arquivo, caminhos))
+        
     print(f"[DEBUG] Thread de processamento SPED finalizada")
 
     if mensagem_final and mensageiro:
@@ -56,11 +54,11 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
             mensageiro.sinal_sucesso.emit(mensagem_final)
 
             print("[DEBUG] Verificando alíquotas nulas")
-            conexao = conectar_banco(nome_banco)
+            conexao = conectar_banco()
             if conexao:
                 print("[DEBUG] Conexão com o banco estabelecida")
                 cursor = conexao.cursor()
-                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL")
+                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL AND empresa_id = %s", (empresa_id,))
                 print("[DEBUG] Executando consulta para produtos com alíquotas nulas")
                 produtos_nulos = cursor.fetchall()
                 if produtos_nulos:
@@ -84,7 +82,7 @@ def processar_sped_thread(nome_banco, progress_bar, label_arquivo, caminhos, jan
     progress_bar.setValue(0)
     loop.close()
 
-def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=None):
+def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=None):
     print(f"[DEBUG] Solicitando seleção de arquivos SPED...")
     caminhos, _ = QFileDialog.getOpenFileNames(None, "Inserir Sped", "", "Arquivos Sped (*.txt)")
     if not caminhos:
@@ -95,7 +93,7 @@ def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=N
     mensageiro = Mensageiro()
     mensageiro.sinal_sucesso.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
     mensageiro.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
-    mensageiro.sinal_verificar_aliquotas.connect(lambda produtos: tratar_aliquotas_nulas(produtos, nome_banco, janela))
+    mensageiro.sinal_verificar_aliquotas.connect(lambda produtos: tratar_aliquotas_nulas(produtos, empresa_id, janela))
     mensageiro_fornecedor.sinal_log.connect(lambda texto: mensagem_sucesso(texto, parent=janela))
     mensageiro_fornecedor.sinal_erro.connect(lambda texto: mensagem_error(texto, parent=janela))
 
@@ -103,15 +101,15 @@ def iniciar_processamento_sped(nome_banco, progress_bar, label_arquivo, janela=N
     for i, caminho in enumerate(caminhos):
         print(f"[DEBUG]   {i+1}. {os.path.basename(caminho)} ({os.path.getsize(caminho)/1024:.1f} KB)")
 
-    thread = threading.Thread(target=processar_sped_thread, args=(nome_banco, progress_bar, label_arquivo, caminhos, janela, mensageiro))
+    thread = threading.Thread(target=processar_sped_thread, args=(empresa_id, progress_bar, label_arquivo, caminhos, janela, mensageiro))
     thread.start()
     print(f"[DEBUG] Thread de processamento SPED iniciada")
 
-async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos):
+async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos):
     progress_bar.setValue(0)
     print(f"[DEBUG] Iniciando processamento de {len(caminhos)} arquivo(s) SPED...")
 
-    conexao = conectar_banco(nome_banco)
+    conexao = conectar_banco()
     if not conexao:
         return False, "Erro ao conectar ao banco"
 
@@ -131,7 +129,7 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos):
         for i, caminho in enumerate(caminhos):
             tasks.append(
                 processar_arquivo(
-                    caminho, nome_banco, progress_bar, label_arquivo, i + 1, total, progresso_por_arquivo
+                    caminho, empresa_id, progress_bar, label_arquivo, i + 1, total, progresso_por_arquivo
                 )
             )
         resultados = await asyncio.gather(*tasks)
@@ -152,7 +150,7 @@ async def processar_sped(nome_banco, progress_bar, label_arquivo, caminhos):
         progress_bar.setValue(0)
         label_arquivo.setText("Processamento finalizado.")
 
-async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, indice, total, progresso_por_arquivo):
+async def processar_arquivo(caminho, empresa_id, progress_bar, label_arquivo, indice, total, progresso_por_arquivo):
     async with sem_limite:
         nome_arquivo = os.path.basename(caminho)
         label_arquivo.setText(f"Processando arquivo {indice}/{total}: {nome_arquivo}")
@@ -163,10 +161,10 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
 
             conteudo_processado = process_data(conteudo)
 
-            conexao = conectar_banco(nome_banco)
+            conexao = conectar_banco()
             cursor = conexao.cursor()
 
-            mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, nome_banco)
+            mensagem = await salvar_no_banco_em_lote(conteudo_processado, cursor, conexao, empresa_id)
 
             conexao.commit()
             cursor.close()
@@ -177,7 +175,7 @@ async def processar_arquivo(caminho, nome_banco, progress_bar, label_arquivo, in
 
             if isinstance(mensagem, str) and not mensagem.lower().startswith(("falha", "erro")):
                 print(f"[DEBUG] {mensagem}")
-                await etapas_pos_processamento(nome_banco, progress_bar)
+                await etapas_pos_processamento(empresa_id, progress_bar)
                 return True, mensagem
             else:
                 return False, mensagem or "Erro desconhecido durante o salvamento."
