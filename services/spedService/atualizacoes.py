@@ -1,39 +1,40 @@
 from db.conexao import conectar_banco, fechar_banco
 
-async def atualizar_ncm(nome_banco):
-    print("Atualizando NCM...")
-    conexao = conectar_banco(nome_banco)
+async def atualizar_ncm(empresa_id):
+    print("Atualizando NCM")
+    conexao = conectar_banco()
     cursor = conexao.cursor()
     try:
         cursor.execute("""
             UPDATE c170_clone n
-            JOIN `0200` c ON n.cod_item = c.cod_item
+            JOIN `0200` c ON n.cod_item = c.cod_item AND c.empresa_id = %s
             SET n.ncm = c.cod_ncm
-            WHERE n.ncm IS NULL OR n.ncm = ''
-        """)
+            WHERE (n.ncm IS NULL OR n.ncm = '') AND n.empresa_id = %s
+        """, (empresa_id, empresa_id))
         conexao.commit()
-        print("Tabela c170_clone atualizada com NCMs da tabela 0200.")
+        print("[OK] c170_clone atualizada com NCMs da 0200.")
     except Exception as err:
-        print(f"Erro ao atualizar NCM: {err}")
+        print(f"[ERRO] ao atualizar NCM: {err}")
         conexao.rollback()
     finally:
         cursor.close()
         fechar_banco(conexao)
 
-async def atualizar_aliquota(nome_banco):
-    conexao = conectar_banco(nome_banco)
+
+async def atualizar_aliquota(empresa_id):
+    conexao = conectar_banco()
     cursor = conexao.cursor()
-    
+
     try:
         cursor.execute("SHOW COLUMNS FROM c170 LIKE 'aliquota'")
         column_info = cursor.fetchone()
         max_length = int(column_info[1].split('(')[1].split(')')[0])
 
         cursor.execute("""
-            SELECT dt_ini FROM `0000`
-            ORDER BY id DESC
-            LIMIT 1
-        """)
+            SELECT dt_ini FROM `0000` 
+            WHERE empresa_id = %s 
+            ORDER BY id DESC LIMIT 1
+        """, (empresa_id,))
         dt_ini = cursor.fetchone()[0]
         ano = int(dt_ini[4:]) if dt_ini else 0
         print(f"[DEBUG] dt_ini: {dt_ini}, ano: {ano}")
@@ -42,44 +43,45 @@ async def atualizar_aliquota(nome_banco):
 
         cursor.execute(f"""
             UPDATE c170 n
-            JOIN cadastro_tributacao c ON n.cod_item = c.codigo
+            JOIN cadastro_tributacao c ON n.cod_item = c.codigo AND c.empresa_id = %s
             SET n.aliquota = LEFT(c.{coluna}, {max_length})
-            WHERE n.aliquota IS NULL OR TRIM(n.aliquota) = ''
-        """)
+            WHERE (n.aliquota IS NULL OR TRIM(n.aliquota) = '') AND n.empresa_id = %s
+        """, (empresa_id, empresa_id))
         conexao.commit()
-        print(f"[OK] c170 atualizada com coluna '{coluna}' de cadastro_tributacao.")
-
+        print(f"[OK] Alíquotas atualizadas com '{coluna}' para empresa_id={empresa_id}.")
     except Exception as err:
-        print(f"[ERRO] Falha ao atualizar alíquotas na tabela c170: {err}")
+        print(f"[ERRO] ao atualizar alíquotas: {err}")
         conexao.rollback()
-    
     finally:
         cursor.close()
         fechar_banco(conexao)
 
-async def atualizar_aliquota_simples(nome_banco, periodo):
-    print("Iniciando atualização de alíquotas para Simples Nacional...")
-    conexao = conectar_banco(nome_banco)
+
+async def atualizar_aliquota_simples(empresa_id, periodo):
+    print("Atualizando alíquotas Simples Nacional")
+    conexao = conectar_banco()
     cursor = conexao.cursor()
 
     try:
         cursor.execute("""
             SELECT COUNT(*) FROM c170_clone c
-            JOIN cadastro_fornecedores f ON f.cod_part = c.cod_part
-            WHERE c.periodo = %s
+            JOIN cadastro_fornecedores f 
+              ON f.cod_part = c.cod_part AND f.empresa_id = %s
+            WHERE c.periodo = %s 
+              AND c.empresa_id = %s
               AND f.simples = 'Sim'
               AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
               AND CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) <= 20.00
-        """, (periodo,))
+        """, (empresa_id, periodo, empresa_id))
         count = cursor.fetchone()[0]
-        print(f"[DEBUG] Registros encontrados para ajuste: {count}")
+        print(f"[DEBUG] Registros a atualizar: {count}")
 
         cursor.execute("""
             UPDATE c170_clone c
-            JOIN cadastro_fornecedores f ON f.cod_part = c.cod_part
+            JOIN cadastro_fornecedores f 
+              ON f.cod_part = c.cod_part AND f.empresa_id = %s
             SET c.aliquota = CASE
-                WHEN 
-                    CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00 <= 30.00
+                WHEN CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00 <= 30.00
                 THEN CONCAT(
                     REPLACE(FORMAT(
                         CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) + 3.00,
@@ -88,22 +90,24 @@ async def atualizar_aliquota_simples(nome_banco, periodo):
                 ELSE c.aliquota
             END
             WHERE c.periodo = %s
+              AND c.empresa_id = %s
               AND f.simples = 'Sim'
               AND c.aliquota REGEXP '^[0-9]+([.,][0-9]*)?%?$'
               AND CAST(REPLACE(REPLACE(c.aliquota, '%', ''), ',', '.') AS DECIMAL(10, 2)) <= 20.00
-        """, (periodo,))
+        """, (empresa_id, periodo, empresa_id))
         conexao.commit()
-        print(f"Conclusão: {count} atualizados (caso tenham passado no filtro).")
+        print(f"[OK] Alíquotas ajustadas para fornecedores do Simples.")
     except Exception as e:
-        print(f"ERRO GERAL: {e}")
+        print(f"[ERRO] ao atualizar alíquota simples: {e}")
         conexao.rollback()
     finally:
         cursor.close()
         fechar_banco(conexao)
 
-async def atualizar_resultado(nome_banco):
-    print("Atualizando resultado...")
-    conexao = conectar_banco(nome_banco)
+
+async def atualizar_resultado(empresa_id):
+    print("Atualizando resultado em c170_clone")
+    conexao = conectar_banco()
     cursor = conexao.cursor()
 
     try:
@@ -115,11 +119,12 @@ async def atualizar_resultado(nome_banco):
                 ELSE CAST(REPLACE(REPLACE(vl_item, '.', ''), ',', '.') AS DECIMAL(10, 2)) *
                      (CAST(REPLACE(REPLACE(aliquota, '%', ''), ',', '.') AS DECIMAL(10, 4)) / 100)
             END
-        """)
+            WHERE empresa_id = %s
+        """, (empresa_id,))
         conexao.commit()
-        print("Resultados calculados com base em vl_item e aliquota.")
+        print("[OK] Resultados calculados com base em vl_item e aliquota.")
     except Exception as err:
-        print(f"Erro ao atualizar resultado: {err}")
+        print(f"[ERRO] ao atualizar resultado: {err}")
         conexao.rollback()
     finally:
         cursor.close()
