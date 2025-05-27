@@ -4,19 +4,20 @@ from mysql.connector import Error
 HOST = 'localhost'
 USUARIO = 'root'
 SENHA = '1234'
+BANCO = 'empresas_db'
 
-def conectar_banco(nome_banco):
+def conectar_banco():
     try:
         conexao = mysql.connector.connect(
             host=HOST,
             user=USUARIO,
             password=SENHA,
-            database=nome_banco if nome_banco else None
+            database=BANCO
         )
         if conexao.is_connected():
             return conexao
     except Error as e:
-        print(f"Erro ao conectar ao banco de dados: {e}")
+        print(f"[ERRO] ao conectar ao banco de dados: {e}")
         return None
 
 def fechar_banco(conexao):
@@ -37,4 +38,4 @@ def tabela_empresa(conexao):
         """)
         conexao.commit()
     except Error as e:
-        print(f"Erro ao criar tabela de empresas: {e}")
+        print(f"[ERRO] ao criar tabela de empresas: {e}")
