@@ -37,7 +37,7 @@ def mapear_colunas(df):
     mensagem_error(f"Erro: Colunas esperadas não encontradas. Colunas atuais: {df.columns.tolist()}")
     return None
 
-def enviar_tributacao(nome_banco, progress_bar):
+def enviar_tributacao(nome_banco, empresa_id, progress_bar):
     progress_bar.setValue(0)
     filename, _ = QFileDialog.getOpenFileName(None, "Enviar Tributação", "", "Arquivos Excel (*.xlsx)")
 
@@ -56,12 +56,15 @@ def enviar_tributacao(nome_banco, progress_bar):
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS cadastro_tributacao (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        codigo VARCHAR(20) UNIQUE,
+        empresa_id INT NOT NULL,
+        codigo VARCHAR(20),
         produto VARCHAR(100),
         ncm VARCHAR(20),
         aliquota VARCHAR(20),
         aliquota_antiga VARCHAR(20),
-        data_inicial DATETIME DEFAULT CURRENT_TIMESTAMP
+        data_inicial DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unq_empresa_codigo (empresa_id, codigo),
+        FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
     );
     """)
     progress_bar.setValue(30)
@@ -83,21 +86,22 @@ def enviar_tributacao(nome_banco, progress_bar):
 
         colunas_para_inserir = [mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA']]
         df_inserir = df[colunas_para_inserir].copy()
+        df_inserir['empresa_id'] = empresa_id
 
-        dados_para_inserir = df_inserir.values.tolist()
+        dados_para_inserir = df_inserir[['empresa_id', mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA']]].values.tolist()
 
         cursor.executemany("""
-            INSERT INTO cadastro_tributacao (codigo, produto, ncm, aliquota)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota)
+            VALUES (%s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 produto = VALUES(produto),
                 ncm = VALUES(ncm),
                 aliquota = IF(VALUES(aliquota) != '', VALUES(aliquota), aliquota)
         """, dados_para_inserir)
-        
+
         print(f"[DEBUG] {cursor.rowcount} linhas inseridas/atualizadas em cadastro_tributacao.")
-        cursor.execute("SELECT COUNT(*) FROM cadastro_tributacao")
-        print(f"[DEBUG] Total de registros em cadastro_tributacao: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM cadastro_tributacao WHERE empresa_id = %s", (empresa_id,))
+        print(f"[DEBUG] Total de registros para empresa_id={empresa_id}: {cursor.fetchone()[0]}")
 
         progress_bar.setValue(80)
 
@@ -114,10 +118,12 @@ def enviar_tributacao(nome_banco, progress_bar):
                 WHEN aliquota = 'PAUTA' THEN 'PAUTA'
                 ELSE 'N/A'
             END
-        """)
-        progress_bar.setValue(90)
+            WHERE empresa_id = %s
+        """, (empresa_id,))
 
+        progress_bar.setValue(90)
         conexao.commit()
+
         atualizar_aliquotas_e_resultado(nome_banco)
 
         progress_bar.setValue(100)
@@ -130,7 +136,7 @@ def enviar_tributacao(nome_banco, progress_bar):
         cursor.close()
         fechar_banco(conexao)
 
-def atualizar_aliquota_c170_clone(nome_banco, periodo=None):
+def atualizar_aliquota_c170_clone(nome_banco, empresa_id=None, periodo=None):
     print("[EXPORTAÇÃO] Atualizando alíquotas na c170_clone com base em cadastro_tributacao...")
     conexao = conectar_banco(nome_banco)
     cursor = conexao.cursor()
@@ -143,6 +149,7 @@ def atualizar_aliquota_c170_clone(nome_banco, periodo=None):
                 WHERE t.aliquota IS NOT NULL 
                   AND TRIM(t.aliquota) <> '' 
                   AND c.periodo = %s
+                  AND t.empresa_id = (SELECT id FROM empresas WHERE LEFT(c.cnpj, 8) = LEFT(empresas.cnpj, 8) LIMIT 1)
             """, (periodo,))
         else:
             cursor.execute("""
@@ -150,6 +157,7 @@ def atualizar_aliquota_c170_clone(nome_banco, periodo=None):
                 JOIN cadastro_tributacao t ON c.cod_item = t.codigo
                 SET c.aliquota = t.aliquota
                 WHERE t.aliquota IS NOT NULL AND TRIM(t.aliquota) <> ''
+                AND t.empresa_id = (SELECT id FROM empresas WHERE LEFT(c.cnpj, 8) = LEFT(empresas.cnpj, 8) LIMIT 1)
             """)
         conexao.commit()
         print("[EXPORTAÇÃO] Alíquotas atualizadas com sucesso na c170_clone.")
@@ -159,4 +167,3 @@ def atualizar_aliquota_c170_clone(nome_banco, periodo=None):
     finally:
         cursor.close()
         fechar_banco(conexao)
-

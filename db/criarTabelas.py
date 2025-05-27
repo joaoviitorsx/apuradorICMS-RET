@@ -57,12 +57,15 @@ def criar_tabelas(cursor):
         '''
         CREATE TABLE IF NOT EXISTS cadastro_tributacao (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            codigo VARCHAR(20) UNIQUE,
+            empresa_id INT NOT NULL,
+            codigo VARCHAR(20),
             produto VARCHAR(100),
             ncm VARCHAR(20),
             aliquota VARCHAR(20),
             aliquota_antiga VARCHAR(20),
-            data_inicial DATETIME DEFAULT CURRENT_TIMESTAMP
+            data_inicial DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unq_empresa_codigo (empresa_id, codigo),
+            FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
         )''',
 
         '''

@@ -36,6 +36,12 @@ def exportar_resultado(nome_banco, mes, ano, progress_bar):
         for row in cursor.fetchall():
             print(dict(zip(colunas_clone, row)))
 
+        cursor.execute("SELECT * FROM c170_clone")
+        colunas_clone = [desc[0] for desc in cursor.description]
+        print("[DEBUG] TODOS os registros em c170_clone:")
+        for row in cursor.fetchall():
+            print(dict(zip(colunas_clone, row)))
+
         cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR TRIM(aliquota) = ''")
         produtos_nulos = cursor.fetchall()
 
