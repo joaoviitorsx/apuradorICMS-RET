@@ -3,18 +3,14 @@ import traceback
 from utils.siglas import obter_sigla_estado
 from PySide6.QtCore import QMetaObject, Qt, QTimer
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-from utils.sanitizacao import (
-    truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,
-    TAMANHOS_MAXIMOS, get_column_index, get_fallback_value,
-    get_fallback_value_by_index, calcular_periodo, validar_estrutura_c170
-)
+from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,TAMANHOS_MAXIMOS, get_column_index, get_fallback_value,get_fallback_value_by_index, calcular_periodo, validar_estrutura_c170
 from services.spedService.atualizacoes import atualizar_aliquota
 from db.conexao import conectar_banco, fechar_banco
 
 UNIDADE_PADRAO = "UN"
 
 async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=None):
-    linhas = conteudo.split('\n')
+    linhas = conteudo 
     print(f"[DEBUG] Iniciando processamento de {len(linhas)} linhas")
 
     contadores = {"0000": 0, "0150": 0, "0200": 0, "C100": 0, "C170": 0, "salvos": 0, "erros": 0}
@@ -29,7 +25,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
         if not lote: return
         try:
             cursor.executemany(sql, lote)
-            print(f"[OK] {descricao}: {len(lote)} registros inseridos.")
+            #print(f"[OK] {descricao}: {len(lote)} registros inseridos.")
             contadores["salvos"] += len(lote)
         except Exception as e:
             if "Duplicate entry" in str(e):
@@ -164,7 +160,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                     continue
 
                 if not validar_estrutura_c170(dados):
-                    print(f"[WARN] C170 inválido: {dados}")
+                    #print(f"[WARN] C170 inválido: {dados}")
                     continue
 
                 lote_c170.append(dados)
@@ -201,7 +197,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
 
         for i in range(0, len(lote_c170), 100):
             lote = lote_c170[i:i+100]
-            print(f"[DEBUG] Tentando inserir lote C170 {i}-{i+len(lote)}, primeiro registro: {lote[0][:5]}...")
+            #print(f"[DEBUG] Tentando inserir lote C170 {i}-{i+len(lote)}, primeiro registro: {lote[0][:5]}...")
             try:
                 cursor.executemany("""
                     INSERT INTO c170 (
