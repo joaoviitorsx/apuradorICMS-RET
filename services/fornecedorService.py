@@ -8,82 +8,75 @@ class Mensageiro(QObject):
 
 mensageiro = Mensageiro()
 
+BATCH_SIZE = 50  # Tamanho do lote de atualização
+
 async def comparar_adicionar_atualizar_fornecedores(empresa_id):
-    print(f"[DEBUG] Iniciando atualização de fornecedores para empresa_id={empresa_id}...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
     try:
-        query_c170 = """
-            SELECT DISTINCT cod_part 
-            FROM c170 
-            WHERE empresa_id = %s
-              AND cod_part IS NOT NULL AND cod_part != ''
-              AND cod_part NOT IN (
-                  SELECT cod_part FROM cadastro_fornecedores WHERE empresa_id = %s
-              )
-        """
-        cursor.execute(query_c170, (empresa_id, empresa_id))
-        novos_cod_part = [row[0] for row in cursor.fetchall()]
-
-        if novos_cod_part:
-            dados_iniciais = [(empresa_id, cod, '', '', '', '', '', '') for cod in novos_cod_part]
-            insert_query = """
-                INSERT INTO cadastro_fornecedores 
-                (empresa_id, cod_part, nome, cnpj, uf, cnae, decreto, simples)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.executemany(insert_query, dados_iniciais)
-            conexao.commit()
-            mensageiro.sinal_log.emit(f"{len(novos_cod_part)} fornecedor(es) novo(s) inserido(s) a partir da c170.")
-
-        query_update_cnpj = """
-            UPDATE cadastro_fornecedores f
-            JOIN `0150` p ON f.cod_part = p.cod_part AND f.empresa_id = p.empresa_id
-            SET f.nome = p.nome, f.cnpj = p.cnpj
-            WHERE f.empresa_id = %s AND (f.cnpj IS NULL OR f.cnpj = '')
-        """
-        cursor.execute(query_update_cnpj, (empresa_id,))
-        conexao.commit()
-
-        query_cnpjs = """
-            SELECT DISTINCT cnpj
-            FROM cadastro_fornecedores
-            WHERE empresa_id = %s
-              AND cnpj IS NOT NULL AND cnpj != ''
-              AND (cnae IS NULL OR cnae = '' OR decreto IS NULL OR decreto = '' OR uf IS NULL OR uf = '')
-        """
-        cursor.execute(query_cnpjs, (empresa_id,))
-        cnpjs_para_atualizar = [row[0] for row in cursor.fetchall()]
-
-        if not cnpjs_para_atualizar:
-            mensageiro.sinal_log.emit("Nenhum fornecedor para atualizar.")
+        print("🔧 Verificando estrutura da tabela cadastro_fornecedores...")
+        cursor.execute("""
+            SHOW COLUMNS FROM cadastro_fornecedores
+            WHERE Field IN ('cnae', 'decreto', 'uf', 'simples')
+        """)
+        columns = [row[0] for row in cursor.fetchall()]
+        if not all(col in columns for col in ['cnae', 'decreto', 'uf', 'simples']):
+            print("⚠️ Colunas obrigatórias não encontradas.")
             return
 
-        print(f"[DEBUG] Consultando dados externos para {len(cnpjs_para_atualizar)} CNPJs...")
-        resultados = await processar_cnpjs(cnpjs_para_atualizar)
+        print("📦 Buscando fornecedores a adicionar...")
+        cursor.execute("""
+            SELECT f.cod_part, f.nome, f.cnpj
+            FROM `0150` f
+            LEFT JOIN cadastro_fornecedores cf ON TRIM(f.cod_part) = TRIM(cf.cod_part) AND f.empresa_id = cf.empresa_id
+            WHERE cf.cod_part IS NULL AND f.cnpj IS NOT NULL AND f.cnpj != '' AND f.empresa_id = %s
+        """, (empresa_id,))
+        fornecedores = cursor.fetchall()
 
-        update_query = """
-            UPDATE cadastro_fornecedores
-            SET cnae = %s, decreto = %s, uf = %s, simples = %s
-            WHERE cnpj = %s AND empresa_id = %s
-        """
+        for cod_part, nome, cnpj in fornecedores:
+            cursor.execute("""
+                INSERT INTO cadastro_fornecedores (empresa_id, cod_part, nome, cnpj, uf, cnae, decreto, simples)
+                VALUES (%s, %s, %s, %s, '', '', '', '')
+            """, (empresa_id, cod_part, nome, cnpj))
+        conexao.commit()
+        print(f"✅ {len(fornecedores)} fornecedores adicionados.")
 
-        dados_update = []
-        for cnpj, info in resultados.items():
-            if info:
-                cnae, decreto, uf, simples = info
-                dados_update.append((cnae, decreto, uf, simples, cnpj, empresa_id))
+        print("📊 Buscando fornecedores com dados pendentes...")
+        cursor.execute("""
+            SELECT cnpj
+            FROM cadastro_fornecedores
+            WHERE empresa_id = %s AND cnpj IS NOT NULL AND cnpj != ''
+              AND (cnae IS NULL OR cnae = '' OR decreto IS NULL OR decreto = '' OR uf IS NULL OR uf = '')
+        """, (empresa_id,))
+        cnpjs = [row[0] for row in cursor.fetchall()]
 
-        if dados_update:
-            cursor.executemany(update_query, dados_update)
+        if not cnpjs:
+            print("🔍 Nenhum CNPJ pendente de atualização.")
+            return
+
+        print(f"🌐 Consultando dados externos para {len(cnpjs)} CNPJs...")
+        resultados = await processar_cnpjs(cnpjs)
+
+        print("🧠 Atualizando cadastro_fornecedores em lotes...")
+        for i in range(0, len(cnpjs), BATCH_SIZE):
+            batch = cnpjs[i:i + BATCH_SIZE]
+            for cnpj in batch:
+                if cnpj in resultados:
+                    cnae, decreto, uf, simples = resultados[cnpj]
+                    cursor.execute("""
+                        UPDATE cadastro_fornecedores
+                        SET cnae = %s, decreto = %s, uf = %s, simples = %s
+                        WHERE cnpj = %s AND empresa_id = %s
+                    """, (cnae, decreto, uf, simples, cnpj, empresa_id))
             conexao.commit()
-            mensageiro.sinal_log.emit(f"{len(dados_update)} fornecedor(es) atualizado(s) com sucesso.")
+            print(f"✅ Lote de {len(batch)} CNPJs atualizado.")
+
+        print("🏁 Atualização concluída com sucesso.")
 
     except Exception as e:
         conexao.rollback()
-        mensageiro.sinal_erro.emit(f"Erro ao atualizar fornecedores: {e}")
-
+        print(f"❌ Erro durante atualização de fornecedores: {e}")
     finally:
         cursor.close()
         fechar_banco(conexao)
