@@ -6,6 +6,19 @@ USUARIO = 'root'
 SENHA = '12345'
 BANCO = 'empresas_db'
 
+def conectar_mysql():
+    try:
+        conexao = mysql.connector.connect(
+            host=HOST,
+            user=USUARIO,
+            password=SENHA
+        )
+        if conexao.is_connected():
+            return conexao
+    except Error as e:
+        print(f"[ERRO] ao conectar ao MySQL: {e}")
+    return None
+
 def conectar_banco():
     try:
         conexao = mysql.connector.connect(
@@ -17,18 +30,41 @@ def conectar_banco():
         if conexao.is_connected():
             return conexao
     except Error as e:
-        print(f"[ERRO] ao conectar ao banco de dados: {e}")
-        return None
+        print(f"[ERRO] ao conectar ao banco de dados '{BANCO}': {e}")
+    return None
 
 def fechar_banco(conexao):
     if conexao and conexao.is_connected():
         conexao.close()
+        print("[INFO] Conexão com banco encerrada.")
 
-def tabela_empresa(conexao):
+def inicializar_banco():
+    from db.criarTabelas import criar_tabelas_principais
+
+    conexao_mysql = conectar_mysql()
+    if not conexao_mysql:
+        print("[FALHA] Não foi possível conectar ao MySQL.")
+        return None
+
+    try:
+        cursor = conexao_mysql.cursor()
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {BANCO}")
+        print(f"[INFO] Banco '{BANCO}' verificado/criado com sucesso.")
+    except Error as e:
+        print(f"[ERRO] ao criar banco '{BANCO}': {e}")
+    finally:
+        fechar_banco(conexao_mysql)
+
+    conexao_final = conectar_banco()
+    if conexao_final:
+        criar_tabela_empresas(conexao_final)
+        criar_tabelas_principais() 
+        return conexao_final
+    return None
+
+def criar_tabela_empresas(conexao):
     try:
         cursor = conexao.cursor()
-        cursor.execute("CREATE DATABASE IF NOT EXISTS empresas_db")
-        cursor.execute("USE empresas_db")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS empresas (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -37,5 +73,6 @@ def tabela_empresa(conexao):
             )
         """)
         conexao.commit()
+        print("[INFO] Tabela 'empresas' criada/verificada com sucesso.")
     except Error as e:
-        print(f"[ERRO] ao criar tabela de empresas: {e}")
+        print(f"[ERRO] ao criar tabela 'empresas': {e}")
