@@ -3,8 +3,7 @@ from ui.cadastroEmpresa import EmpresaCadastro
 from ui.telaPrincipal import MainWindow
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectar_banco, fechar_banco, tabela_empresa
-from db.criarTabelas import criar_tabelas_principais
+from db.conexao import conectar_banco, fechar_banco, inicializar_banco
 
 class WorkerInicializacao(QtCore.QThread):
     terminado = QtCore.Signal()
@@ -12,12 +11,9 @@ class WorkerInicializacao(QtCore.QThread):
 
     def run(self):
         try:
-            conexao = conectar_banco()
+            conexao = inicializar_banco()
             if conexao:
-                tabela_empresa(conexao)
-                print("[DEBUG] Banco de dados preparado com sucesso!")
-                criar_tabelas_principais()
-                print("[DEBUG] Tabelas criadas com sucesso.")
+                print("[DEBUG] Banco e tabelas garantidos com sucesso!")
                 fechar_banco(conexao)
             self.terminado.emit()
         except Exception as e:
