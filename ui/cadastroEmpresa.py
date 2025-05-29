@@ -2,7 +2,7 @@ import re
 from PySide6 import QtWidgets, QtCore, QtGui
 from utils.mensagem import mensagem_error, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectar_banco, tabela_empresa
+from db.conexao import conectar_banco, fechar_banco, inicializar_banco
 
 class EmpresaCadastro(QtWidgets.QWidget):
     def __init__(self, nome_banco):
@@ -118,7 +118,6 @@ class CadastroEmpresaWorker(QtCore.QThread):
     def run(self):
         try:
             conexao = conectar_banco()
-            tabela_empresa(conexao)
             cursor = conexao.cursor()
             cursor.execute("INSERT INTO empresas (cnpj, razao_social) VALUES (%s, %s)", (self.cnpj, self.razao))
             conexao.commit()
@@ -127,3 +126,4 @@ class CadastroEmpresaWorker(QtCore.QThread):
             self.cadastro_finalizado.emit("Empresa cadastrada com sucesso.")
         except Exception as e:
             self.erro_ocorrido.emit(str(e))
+
