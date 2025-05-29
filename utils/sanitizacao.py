@@ -41,18 +41,15 @@ def corrigir_unidade(valor):
     valor_str = str(valor)
     
     if re.match(r'^\d+[,\.]\d+$', valor_str) or re.match(r'^\d+$', valor_str):
-        print(f"[AJUSTE] Campo de unidade numérico: '{valor_str}' → 'UN'")
         return 'UN'
     
     match = re.match(r'^([A-Za-z]+)(\d+)', valor_str)
     if match:
         unidade_base = match.group(1)
-        print(f"[AJUSTE] Unidade com número: '{valor_str}' → '{unidade_base}'")
         return unidade_base
     
     tamanho_banco = 3
     if len(valor_str) > tamanho_banco:
-        print(f"[TRUNCAR] Unidade: '{valor_str}' → '{valor_str[:tamanho_banco]}'")
         return valor_str[:tamanho_banco]
     
     return valor_str
