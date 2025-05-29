@@ -58,7 +58,7 @@ def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, jan
             if conexao:
                 print("[DEBUG] Conexão com o banco estabelecida")
                 cursor = conexao.cursor()
-                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL AND empresa_id = %s", (empresa_id,))
+                cursor.execute("SELECT codigo, produto, ncm FROM cadastro_tributacao WHERE aliquota IS NULL OR aliquota = '' AND empresa_id = %s", (empresa_id,))
                 print("[DEBUG] Executando consulta para produtos com alíquotas nulas")
                 produtos_nulos = cursor.fetchall()
                 if produtos_nulos:
@@ -124,19 +124,50 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos):
     total = len(caminhos)
     progresso_por_arquivo = math.ceil(100 / total) if total > 0 else 100
 
+    dados_gerais = []
+
     try:
-        tasks = []
         for i, caminho in enumerate(caminhos):
-            tasks.append(
-                processar_arquivo(
-                    caminho, empresa_id, progress_bar, label_arquivo, i + 1, total, progresso_por_arquivo
-                )
-            )
-        resultados = await asyncio.gather(*tasks)
-        sucesso_total = all(r[0] for r in resultados)
-        mensagens = [r[1] for r in resultados if r[1]]
-        mensagem_final = "\n".join(mensagens)
-        return sucesso_total, mensagem_final
+            nome_arquivo = os.path.basename(caminho)
+            label_arquivo.setText(f"Processando arquivo {i+1}/{total}: {nome_arquivo}")
+
+            with open(caminho, 'r', encoding='utf-8', errors='ignore') as arquivo:
+                conteudo = arquivo.read()
+            
+            print(f"[DEBUG] Lendo: {nome_arquivo}")
+            print(f"[DEBUG] Tamanho conteúdo bruto: {len(conteudo)}")
+
+            conteudo_processado = process_data(conteudo)
+            print(f"[DEBUG] Resultado process_data: Tipo={type(conteudo_processado)}, Tamanho={len(conteudo_processado) if isinstance(conteudo_processado, list) else 'N/A'}")
+
+            if isinstance(conteudo_processado, str):
+                linhas = conteudo_processado.splitlines()
+            elif isinstance(conteudo_processado, list):
+                linhas = conteudo_processado
+            else:
+                linhas = []
+
+            print(f"[DEBUG] Adicionando {len(linhas)} linhas do arquivo {nome_arquivo}")
+            dados_gerais.extend(linhas)
+
+
+            progresso_atual = min((i + 1) * progresso_por_arquivo, 100)
+            progress_bar.setValue(progresso_atual)
+            await asyncio.sleep(0.1)
+
+        conexao = conectar_banco()
+        cursor = conexao.cursor()
+
+        mensagem = await salvar_no_banco_em_lote(dados_gerais, cursor, conexao, empresa_id)
+        conexao.commit()
+        cursor.close()
+        fechar_banco(conexao)
+
+        if isinstance(mensagem, str) and not mensagem.lower().startswith(("falha", "erro")):
+            await etapas_pos_processamento(empresa_id, progress_bar)
+            return True, mensagem
+        else:
+            return False, mensagem or "Erro durante salvamento em lote."
 
     except Exception as e:
         import traceback
