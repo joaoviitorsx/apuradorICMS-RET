@@ -5,6 +5,42 @@ from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QFileDialog
 from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
+class WorkerSalvarAliquotas(QtCore.QThread):
+    terminou = QtCore.Signal()
+    erro = QtCore.Signal(str)
+
+    def __init__(self, dados, empresa_id):
+        super().__init__()
+        self.dados = dados
+        self.empresa_id = empresa_id
+
+    def run(self):
+        try:
+            conexao = conectar_banco()
+            if not conexao:
+                raise Exception("Erro ao conectar ao banco de dados.")
+            cursor = conexao.cursor()
+
+            for codigo, aliquota in self.dados:
+                cursor.execute("""
+                    UPDATE cadastro_tributacao 
+                    SET aliquota = %s 
+                    WHERE codigo = %s AND empresa_id = %s
+                """, (aliquota, codigo, self.empresa_id))
+
+            conexao.commit()
+            atualizar_aliquotas_e_resultado(self.empresa_id)
+        except Exception as e:
+            self.erro.emit(str(e))
+        else:
+            self.terminou.emit()
+        finally:
+            try:
+                cursor.close()
+                fechar_banco(conexao)
+            except:
+                pass
+
 class PopupAliquota(QtWidgets.QDialog):
     def __init__(self, dados, empresa_id, parent=None):
         super().__init__(parent)
@@ -50,6 +86,7 @@ class PopupAliquota(QtWidgets.QDialog):
 
         btn_salvar = QtWidgets.QPushButton("Salvar Tudo")
         btn_salvar.setObjectName("btn_salvar")
+        btn_salvar.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         btn_salvar.clicked.connect(self.salvar_todas)
         botoes_layout.addWidget(btn_salvar)
 
@@ -96,38 +133,19 @@ class PopupAliquota(QtWidgets.QDialog):
         """)
 
     def salvar_todas(self):
-        conexao = conectar_banco()
-        if not conexao:
-            mensagem_error("Erro ao conectar ao banco de dados.")
-            return
-        cursor = conexao.cursor()
-        try:
-            for row in range(self.tabela.rowCount()):
-                codigo = self.tabela.item(row, 0).text()
-                aliquota = self.tabela.cellWidget(row, 3).currentText()
-                if aliquota not in self.aliquotas:
-                    mensagem_error(f"Alíquota inválida para o código {codigo}: {aliquota}")
-                    return
-                cursor.execute("""
-                    UPDATE cadastro_tributacao 
-                    SET aliquota = %s 
-                    WHERE codigo = %s AND empresa_id = %s
-                """, (aliquota, codigo, self.empresa_id))
+        dados_para_salvar = []
+        for row in range(self.tabela.rowCount()):
+            codigo = self.tabela.item(row, 0).text()
+            aliquota = self.tabela.cellWidget(row, 3).currentText()
+            if aliquota not in self.aliquotas:
+                mensagem_error(f"Alíquota inválida para o código {codigo}: {aliquota}")
+                return
+            dados_para_salvar.append((codigo, aliquota))
 
-            conexao.commit()
-            mensagem_sucesso("Alíquotas salvas com sucesso!")
-
-            print("[DEBUG] Chamando atualizar_aliquotas_e_resultado...")
-            atualizar_aliquotas_e_resultado(self.empresa_id)
-            print("[DEBUG] Finalizado atualizar_aliquotas_e_resultado.")
-
-            self.accept()
-        except Exception as e:
-            mensagem_error(f"Erro ao salvar alíquotas: {e}")
-            conexao.rollback()
-        finally:
-            cursor.close()
-            fechar_banco(conexao)
+        self.worker = WorkerSalvarAliquotas(dados_para_salvar, self.empresa_id)
+        self.worker.terminou.connect(self._sucesso_salvar)
+        self.worker.erro.connect(self._erro_salvar)
+        self.worker.start()
 
     def importar_planilha(self):
         caminho, _ = QFileDialog.getOpenFileName(self, "Importar Planilha de Alíquotas", "", "Excel (*.xlsx *.xls)")
@@ -173,3 +191,10 @@ class PopupAliquota(QtWidgets.QDialog):
             mensagem_sucesso("Planilha modelo gerada com sucesso!")
         except Exception as e:
             mensagem_error(f"Erro ao gerar planilha modelo: {e}")
+
+    def _sucesso_salvar(self):
+        mensagem_sucesso("Alíquotas salvas com sucesso!")
+        self.accept()
+
+    def _erro_salvar(self, erro):
+        mensagem_error(f"Erro ao salvar alíquotas: {erro}")
