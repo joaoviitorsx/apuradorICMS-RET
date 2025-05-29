@@ -1,12 +1,7 @@
 from db.conexao import conectar_banco, fechar_banco
 from services.fornecedorService import comparar_adicionar_atualizar_fornecedores
 from services.spedService.tributacao import criar_e_preencher_c170nova, atualizar_cadastro_tributacao
-from services.spedService.atualizacoes import (
-    atualizar_ncm,
-    atualizar_aliquota,
-    atualizar_aliquota_simples,
-    atualizar_resultado
-)
+from services.spedService.atualizacoes import atualizar_ncm, atualizar_aliquota, atualizar_aliquota_simples,atualizar_resultado, preencher_aliquota_c170_clone
 from services.spedService.clonagem import clonar_tabela_c170
 
 async def etapas_pos_processamento(empresa_id, progress_bar):
@@ -29,8 +24,8 @@ async def etapas_pos_processamento(empresa_id, progress_bar):
     print("[POS] Tabela cadastro_tributacao atualizada com base em c170_clone.")
 
     progress_bar.setValue(65)
-    await atualizar_aliquota(empresa_id)
-    print("[POS] Alíquotas atualizadas com base em cadastro_tributacao.")
+    preencher_aliquota_c170_clone(empresa_id)
+    print("[POS] Alíquotas preenchidas e sincronizadas com cadastro_tributacao.")
 
     progress_bar.setValue(70)
     await atualizar_ncm(empresa_id)
