@@ -132,6 +132,7 @@ def criar_tabelas_principais():
                 qtd VARCHAR(20),
                 unid VARCHAR(10),
                 vl_item VARCHAR(20),
+                vl_desc VARCHAR(20),
                 ind_mov VARCHAR(5),
                 cst_icms VARCHAR(10),
                 cfop VARCHAR(10),
@@ -168,7 +169,9 @@ def criar_tabelas_principais():
                 cod_part VARCHAR(60),
                 num_doc VARCHAR(20),
                 chv_nfe VARCHAR(60),
-                aliquota VARCHAR(10),
+                ncm VARCHAR(44) DEFAULT '',
+                MERCADO VARCHAR(15) DEFAULT '',
+                aliquota VARCHAR(10) DEFAULT '',
                 resultado VARCHAR(20),
                 INDEX idx_empresa (empresa_id)
             )
@@ -216,6 +219,8 @@ def criar_tabelas_principais():
                 vl_item VARCHAR(20),
                 vl_desc VARCHAR(20),
                 cfop VARCHAR(10),
+                cst varchar(3),
+                ncm varchar(40),      
                 id_c100 INT,
                 filial VARCHAR(10),
                 ind_oper VARCHAR(5),
@@ -238,18 +243,18 @@ def criar_tabelas_principais():
                 reg VARCHAR(10),
                 num_item VARCHAR(10),
                 descr_compl VARCHAR(255),
+                cod_ncm VARCHAR(40),
                 qtd VARCHAR(20),
                 unid VARCHAR(10),
                 vl_item VARCHAR(20),
                 vl_desc VARCHAR(20),
                 cfop VARCHAR(10),
-                id_c100 INT,
+                id_c100 VARCHAR(10),
                 filial VARCHAR(10),
                 ind_oper VARCHAR(5),
                 cod_part VARCHAR(60),
                 num_doc VARCHAR(20),
                 chv_nfe VARCHAR(60),
-                cod_ncm VARCHAR(20),
                 INDEX idx_empresa (empresa_id)
             )
         """)
