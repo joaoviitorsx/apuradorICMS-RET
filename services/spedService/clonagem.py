@@ -15,7 +15,7 @@ async def clonar_tabela_c170(empresa_id):
             )
             SELECT 
                 empresa_id, periodo, reg, num_item, cod_item, descr_compl,
-                qtd, unid, vl_item, vl_desc, cfop, NULL, cod_ncm, id_c100, filial,
+                qtd, unid, vl_item, vl_desc, cst_icms, cfop, NULL, cod_ncm, id_c100, filial,
                 ind_oper, cod_part, num_doc, chv_nfe, NULL, NULL,
                 CONCAT(cod_item, chv_nfe)
             FROM c170nova
