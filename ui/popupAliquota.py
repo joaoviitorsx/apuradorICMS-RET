@@ -1,9 +1,10 @@
 from PySide6 import QtWidgets, QtGui, QtCore
 from utils.mensagem import mensagem_error, mensagem_sucesso
-import pandas as pd
+from utils.sanitizacao import executar_async
 from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QFileDialog
 from utils.sanitizacao import atualizar_aliquotas_e_resultado
+import pandas as pd
 
 class WorkerSalvarAliquotas(QtCore.QThread):
     terminou = QtCore.Signal()
@@ -19,24 +20,26 @@ class WorkerSalvarAliquotas(QtCore.QThread):
             conexao = conectar_banco()
             if not conexao:
                 raise Exception("Erro ao conectar ao banco de dados.")
-            cursor = conexao.cursor()
 
-            for codigo, aliquota in self.dados:
-                cursor.execute("""
-                    UPDATE cadastro_tributacao 
-                    SET aliquota = %s 
-                    WHERE codigo = %s AND empresa_id = %s
-                """, (aliquota, codigo, self.empresa_id))
+            with conexao.cursor() as cursor:
+                linhas_afetadas = 0
+                for codigo, aliquota in self.dados:
+                    cursor.execute("""
+                        UPDATE cadastro_tributacao 
+                        SET aliquota = %s 
+                        WHERE codigo = %s AND empresa_id = %s
+                    """, (aliquota, codigo, self.empresa_id))
+                    linhas_afetadas += cursor.rowcount
 
-            conexao.commit()
-            atualizar_aliquotas_e_resultado(self.empresa_id)
+                conexao.commit()
+                print(f"[DEBUG] Linhas atualizadas: {linhas_afetadas}")
+
         except Exception as e:
             self.erro.emit(str(e))
         else:
             self.terminou.emit()
         finally:
             try:
-                cursor.close()
                 fechar_banco(conexao)
             except:
                 pass
@@ -47,8 +50,8 @@ class PopupAliquota(QtWidgets.QDialog):
         self.setWindowTitle("Preencher Alíquotas Nulas")
         self.setGeometry(300, 150, 900, 600)
 
-        self.dados = dados              # Lista de (codigo, produto, ncm)
-        self.empresa_id = empresa_id    # ID da empresa
+        self.dados = dados
+        self.empresa_id = empresa_id
         self.aliquotas = ["1.54%", "4.00%", "8.13%", "ST", "ISENTO"]
 
         self._setup_ui()
@@ -56,80 +59,52 @@ class PopupAliquota(QtWidgets.QDialog):
 
     def _setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
-
-        self.tabela = QtWidgets.QTableWidget()
-        self.tabela.setColumnCount(4)
-        self.tabela.setHorizontalHeaderLabels(["Código", "Produto", "NCM", "Alíquota"])
-        self.tabela.setRowCount(len(self.dados))
-
-        for row, (codigo, produto, ncm) in enumerate(self.dados):
-            self.tabela.setItem(row, 0, QtWidgets.QTableWidgetItem(str(codigo)))
-            self.tabela.setItem(row, 1, QtWidgets.QTableWidgetItem(str(produto)))
-            self.tabela.setItem(row, 2, QtWidgets.QTableWidgetItem(str(ncm)))
-
-            combo = QtWidgets.QComboBox()
-            combo.addItems(self.aliquotas)
-            self.tabela.setCellWidget(row, 3, combo)
-
-        self.tabela.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.tabela = self._criar_tabela()
         layout.addWidget(self.tabela)
 
         botoes_layout = QtWidgets.QHBoxLayout()
-
-        btn_modelo = QtWidgets.QPushButton("Gerar Planilha Modelo")
-        btn_modelo.clicked.connect(self.gerar_planilha_modelo)
-        botoes_layout.addWidget(btn_modelo)
-
-        btn_importar = QtWidgets.QPushButton("Importar Planilha")
-        btn_importar.clicked.connect(self.importar_planilha)
-        botoes_layout.addWidget(btn_importar)
-
-        btn_salvar = QtWidgets.QPushButton("Salvar Tudo")
-        btn_salvar.setObjectName("btn_salvar")
-        btn_salvar.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        btn_salvar.clicked.connect(self.salvar_todas)
+        botoes_layout.addWidget(self._criar_botao("Gerar Planilha Modelo", self.gerar_planilha_modelo))
+        botoes_layout.addWidget(self._criar_botao("Importar Planilha", self.importar_planilha))
+        btn_salvar = self._criar_botao("Salvar Tudo", self.salvar_todas, "btn_salvar")
         botoes_layout.addWidget(btn_salvar)
 
         layout.addLayout(botoes_layout)
 
+    def _criar_tabela(self):
+        tabela = QtWidgets.QTableWidget()
+        tabela.setColumnCount(4)
+        tabela.setHorizontalHeaderLabels(["Código", "Produto", "NCM", "Alíquota"])
+        tabela.setRowCount(len(self.dados))
+
+        for row, (codigo, produto, ncm) in enumerate(self.dados):
+            tabela.setItem(row, 0, QtWidgets.QTableWidgetItem(str(codigo)))
+            tabela.setItem(row, 1, QtWidgets.QTableWidgetItem(str(produto)))
+            tabela.setItem(row, 2, QtWidgets.QTableWidgetItem(str(ncm)))
+            combo = QtWidgets.QComboBox()
+            combo.addItems(self.aliquotas)
+            tabela.setCellWidget(row, 3, combo)
+
+        tabela.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        return tabela
+
+    def _criar_botao(self, texto, funcao, obj_name=None):
+        botao = QtWidgets.QPushButton(texto)
+        botao.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        botao.clicked.connect(funcao)
+        if obj_name:
+            botao.setObjectName(obj_name)
+        return botao
+
     def _aplicar_estilo(self):
         self.setStyleSheet("""
-            QDialog {
-                background-color: #030d18;
-            }
-            QTableWidget {
-                background-color: #ffffff;
-                color: #000000;
-                gridline-color: #cccccc;
-                font-size: 14px;
-            }
-            QHeaderView::section {
-                background-color: #001F3F;
-                color: white;
-                padding: 4px;
-                font-weight: bold;
-                border: 1px solid #2E236C;
-            }
-            QComboBox {
-                background-color: #ffffff;
-                color: #000000;
-            }
-            QPushButton {
-                padding: 6px 12px;
-                font-size: 14px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #2E236C;
-                color: white;
-            }
-            QPushButton#btn_salvar {
-                background-color: #28a745;
-                color: white;
-            }
-            QPushButton#btn_salvar:hover {
-                background-color: #218838;
-            }
+            QDialog { background-color: #030d18; }
+            QTableWidget { background-color: #ffffff; color: #000000; gridline-color: #cccccc; font-size: 14px; }
+            QHeaderView::section { background-color: #001F3F; color: white; padding: 4px; font-weight: bold; border: 1px solid #2E236C; }
+            QComboBox { background-color: #ffffff; color: #000000; }
+            QPushButton { padding: 6px 12px; font-size: 14px; border-radius: 5px; }
+            QPushButton:hover { background-color: #2E236C; color: white; }
+            QPushButton#btn_salvar { background-color: #28a745; color: white; }
+            QPushButton#btn_salvar:hover { background-color: #218838; }
         """)
 
     def salvar_todas(self):
@@ -143,9 +118,17 @@ class PopupAliquota(QtWidgets.QDialog):
             dados_para_salvar.append((codigo, aliquota))
 
         self.worker = WorkerSalvarAliquotas(dados_para_salvar, self.empresa_id)
-        self.worker.terminou.connect(self._sucesso_salvar)
+        self.worker.terminou.connect(self._executar_atualizacao)
         self.worker.erro.connect(self._erro_salvar)
         self.worker.start()
+
+    def _executar_atualizacao(self):
+        try:
+            executar_async(atualizar_aliquotas_e_resultado(self.empresa_id))
+            mensagem_sucesso("Alíquotas salvas e atualizadas com sucesso!")
+            self.accept()
+        except Exception as e:
+            mensagem_error(f"Erro ao atualizar resultados após salvar alíquotas: {e}")
 
     def importar_planilha(self):
         caminho, _ = QFileDialog.getOpenFileName(self, "Importar Planilha de Alíquotas", "", "Excel (*.xlsx *.xls)")
@@ -154,11 +137,10 @@ class PopupAliquota(QtWidgets.QDialog):
 
         try:
             df = pd.read_excel(caminho, dtype=str)
-            colunas = list(df.columns.str.upper())
-            df.columns = colunas
+            df.columns = [col.upper() for col in df.columns]
 
-            col_cod = next((c for c in colunas if 'COD' in c), None)
-            col_aliq = next((c for c in colunas if 'ALIQ' in c), None)
+            col_cod = next((c for c in df.columns if 'COD' in c), None)
+            col_aliq = next((c for c in df.columns if 'ALIQ' in c), None)
 
             if not col_cod or not col_aliq:
                 mensagem_error("A planilha deve conter colunas semelhantes a 'CÓDIGO' e 'ALÍQUOTA'.")
@@ -191,10 +173,6 @@ class PopupAliquota(QtWidgets.QDialog):
             mensagem_sucesso("Planilha modelo gerada com sucesso!")
         except Exception as e:
             mensagem_error(f"Erro ao gerar planilha modelo: {e}")
-
-    def _sucesso_salvar(self):
-        mensagem_sucesso("Alíquotas salvas com sucesso!")
-        self.accept()
 
     def _erro_salvar(self, erro):
         mensagem_error(f"Erro ao salvar alíquotas: {erro}")

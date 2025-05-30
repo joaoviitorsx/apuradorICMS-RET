@@ -26,9 +26,7 @@ def preencher_aliquota_c170_clone(empresa_id):
     print("[INÍCIO] Preenchendo alíquotas na c170_clone com base na tabela cadastro_tributacao...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
-
     try:
-        # Preencher onde está nulo ou vazio usando aliquota prioritariamente, e aliquota_antiga como fallback
         cursor.execute("""
             UPDATE c170_clone c
             JOIN cadastro_tributacao t
@@ -44,7 +42,6 @@ def preencher_aliquota_c170_clone(empresa_id):
         """, (empresa_id,))
         print(f"[OK] Alíquotas preenchidas: {cursor.rowcount} linhas (empresa_id={empresa_id})")
 
-        # Atualizar as divergentes (valor diferente do cadastro_tributacao)
         cursor.execute("""
             UPDATE c170_clone c
             JOIN cadastro_tributacao t
@@ -58,7 +55,6 @@ def preencher_aliquota_c170_clone(empresa_id):
         print(f"[OK] Alíquotas corrigidas: {cursor.rowcount} linhas (empresa_id={empresa_id})")
 
         conexao.commit()
-
     except Exception as e:
         conexao.rollback()
         print(f"[ERRO] ao preencher alíquotas: {e}")
@@ -68,22 +64,15 @@ def preencher_aliquota_c170_clone(empresa_id):
         print("[FIM] Finalização do preenchimento de alíquotas na c170_clone.")
 
 def atualizar_aliquota(empresa_id):
-    from db.conexao import conectar_banco, fechar_banco
-
     print("[INÍCIO] Atualizando alíquotas em c170_clone...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
-
     try:
         cursor.execute("SHOW COLUMNS FROM c170_clone LIKE 'aliquota'")
         column_info = cursor.fetchone()
         max_length = int(column_info[1].split('(')[1].split(')')[0])
 
-        cursor.execute("""
-            SELECT dt_ini FROM `0000` 
-            WHERE empresa_id = %s 
-            ORDER BY id DESC LIMIT 1
-        """, (empresa_id,))
+        cursor.execute("SELECT dt_ini FROM `0000` WHERE empresa_id = %s ORDER BY id DESC LIMIT 1", (empresa_id,))
         row = cursor.fetchone()
 
         if not row or not row[0]:
@@ -103,7 +92,6 @@ def atualizar_aliquota(empresa_id):
         conexao.commit()
 
         print(f"[OK] Alíquotas atualizadas com '{coluna}' para empresa_id {empresa_id}.")
-
     except Exception as err:
         print(f"[ERRO] ao atualizar alíquotas: {err}")
         conexao.rollback()

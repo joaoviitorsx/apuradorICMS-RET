@@ -269,7 +269,7 @@ def criar_tabelas_principais():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tributacao_empresa_aliquota ON cadastro_tributacao (empresa_id, aliquota)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_aliquota_empresa ON c170_clone (empresa_id, aliquota)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fornecedor_empresa_simples ON cadastro_fornecedores (empresa_id, simples)")
-        cursor.execute("CREATE INDEX idx_c170nova_descr_ncm_null ON c170nova (empresa_id, descr_compl, cod_ncm);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170nova_descr_ncm_null ON c170nova (empresa_id, descr_compl, cod_ncm);")
 
 
         cursor.execute("INSERT INTO cadastro_fornecedores(empresa_id, cod_part, nome, cnpj, uf, cnae, decreto, simples) VALUES (1, '55', null , null , 'CE', null , 'Não', null);")
