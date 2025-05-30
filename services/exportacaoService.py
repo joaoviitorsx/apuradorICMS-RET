@@ -16,7 +16,7 @@ def exportar_resultado(empresa_id, mes, ano, progress_bar):
     print(f"[DEBUG] Exportando resultado para {mes}/{ano} para empresa_id={empresa_id}")
     try:
         progress_bar.setValue(5)
-        periodo = f"{int(mes):02d}{ano}"
+        periodo = f"{int(mes):02d}/{ano}"
 
         conexao = conectar_banco()
         if not conexao:
@@ -39,11 +39,11 @@ def exportar_resultado(empresa_id, mes, ano, progress_bar):
                 return
 
         cursor.execute("""
-            SELECT c.*, f.nome, f.cnpj 
+            SELECT c.*, IFNULL(f.nome, '') AS nome, IFNULL(f.cnpj, '') AS cnpj 
             FROM c170_clone c 
-            INNER JOIN 0150 f ON f.cod_part = c.cod_part 
-            WHERE c.periodo = %s AND c.empresa_id = %s AND f.empresa_id = %s
-        """, (periodo, empresa_id, empresa_id))
+            LEFT JOIN `0150` f ON f.cod_part = c.cod_part AND f.empresa_id = c.empresa_id
+            WHERE c.periodo = %s AND c.empresa_id = %s
+        """, (periodo, empresa_id))
         dados = cursor.fetchall()
 
         if not dados:
@@ -63,7 +63,7 @@ def exportar_resultado(empresa_id, mes, ano, progress_bar):
         nome_empresa_result = cursor.fetchone()
         nome_empresa = nome_empresa_result[0] if nome_empresa_result else "empresa"
 
-        cursor.execute("SELECT periodo, dt_ini, dt_fin FROM 0000 WHERE empresa_id = %s AND periodo = %s LIMIT 1", (empresa_id, periodo))
+        cursor.execute("SELECT periodo, dt_ini, dt_fin FROM `0000` WHERE empresa_id = %s AND periodo = %s LIMIT 1", (empresa_id, periodo))
         resultado = cursor.fetchone()
         if not resultado:
             mensagem_error("Período não encontrado na tabela 0000.")
