@@ -13,8 +13,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setGeometry(200, 200, 900, 700)
         self.setStyleSheet('background-color: #030d18;')
 
-        self.empresa = empresa              # Nome da empresa (texto)
-        self.empresa_id = empresa_id        # ID único no banco
+        self.empresa = empresa             
+        self.empresa_id = empresa_id        
 
         self.central_widget = QtWidgets.QWidget()
         self.setCentralWidget(self.central_widget)
