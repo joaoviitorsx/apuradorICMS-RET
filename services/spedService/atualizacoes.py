@@ -22,47 +22,6 @@ async def atualizar_ncm(empresa_id):
         cursor.close()
         fechar_banco(conexao)
 
-def preencher_aliquota_c170_clone(empresa_id):
-    print("[INÍCIO] Preenchendo alíquotas na c170_clone com base na tabela cadastro_tributacao...")
-    conexao = conectar_banco()
-    cursor = conexao.cursor()
-    try:
-        cursor.execute("""
-            UPDATE c170_clone c
-            JOIN cadastro_tributacao t
-              ON c.cod_item = t.codigo AND c.empresa_id = t.empresa_id
-            SET c.aliquota = 
-                CASE 
-                    WHEN t.aliquota IS NOT NULL AND TRIM(t.aliquota) != '' THEN t.aliquota
-                    WHEN t.aliquota_antiga IS NOT NULL AND TRIM(t.aliquota_antiga) != '' THEN t.aliquota_antiga
-                    ELSE c.aliquota
-                END
-            WHERE (c.aliquota IS NULL OR TRIM(c.aliquota) = '')
-              AND c.empresa_id = %s
-        """, (empresa_id,))
-        print(f"[OK] Alíquotas preenchidas: {cursor.rowcount} linhas (empresa_id={empresa_id})")
-
-        cursor.execute("""
-            UPDATE c170_clone c
-            JOIN cadastro_tributacao t
-              ON c.cod_item = t.codigo AND c.empresa_id = t.empresa_id
-            SET c.aliquota = t.aliquota
-            WHERE c.aliquota IS NOT NULL AND TRIM(c.aliquota) != ''
-              AND t.aliquota IS NOT NULL AND TRIM(t.aliquota) != ''
-              AND TRIM(c.aliquota) != TRIM(t.aliquota)
-              AND c.empresa_id = %s
-        """, (empresa_id,))
-        print(f"[OK] Alíquotas corrigidas: {cursor.rowcount} linhas (empresa_id={empresa_id})")
-
-        conexao.commit()
-    except Exception as e:
-        conexao.rollback()
-        print(f"[ERRO] ao preencher alíquotas: {e}")
-    finally:
-        cursor.close()
-        fechar_banco(conexao)
-        print("[FIM] Finalização do preenchimento de alíquotas na c170_clone.")
-
 def atualizar_aliquota(empresa_id):
     print("[INÍCIO] Atualizando alíquotas em c170_clone...")
     conexao = conectar_banco()

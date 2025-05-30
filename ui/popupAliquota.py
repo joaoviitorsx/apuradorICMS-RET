@@ -1,178 +1,80 @@
-from PySide6 import QtWidgets, QtGui, QtCore
-from utils.mensagem import mensagem_error, mensagem_sucesso
-from utils.sanitizacao import executar_async
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
+from PySide6.QtCore import Qt
 from db.conexao import conectar_banco, fechar_banco
-from PySide6.QtWidgets import QFileDialog
 from utils.sanitizacao import atualizar_aliquotas_e_resultado
-import pandas as pd
 
-class WorkerSalvarAliquotas(QtCore.QThread):
-    terminou = QtCore.Signal()
-    erro = QtCore.Signal(str)
-
-    def __init__(self, dados, empresa_id):
-        super().__init__()
-        self.dados = dados
-        self.empresa_id = empresa_id
-
-    def run(self):
-        try:
-            conexao = conectar_banco()
-            if not conexao:
-                raise Exception("Erro ao conectar ao banco de dados.")
-
-            with conexao.cursor() as cursor:
-                linhas_afetadas = 0
-                for codigo, aliquota in self.dados:
-                    cursor.execute("""
-                        UPDATE cadastro_tributacao 
-                        SET aliquota = %s 
-                        WHERE codigo = %s AND empresa_id = %s
-                    """, (aliquota, codigo, self.empresa_id))
-                    linhas_afetadas += cursor.rowcount
-
-                conexao.commit()
-                print(f"[DEBUG] Linhas atualizadas: {linhas_afetadas}")
-
-        except Exception as e:
-            self.erro.emit(str(e))
-        else:
-            self.terminou.emit()
-        finally:
-            try:
-                fechar_banco(conexao)
-            except:
-                pass
-
-class PopupAliquota(QtWidgets.QDialog):
-    def __init__(self, dados, empresa_id, parent=None):
+class PopupAliquota(QDialog):
+    def __init__(self, empresa_id, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Preencher Alíquotas Nulas")
-        self.setGeometry(300, 150, 900, 600)
-
-        self.dados = dados
         self.empresa_id = empresa_id
-        self.aliquotas = ["1.54%", "4.00%", "8.13%", "ST", "ISENTO"]
+        self.setWindowTitle("Preencher Alíquotas Nulas")
+        self.setMinimumSize(800, 600)
+        self.setup_ui()
 
-        self._setup_ui()
-        self._aplicar_estilo()
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
 
-    def _setup_ui(self):
-        layout = QtWidgets.QVBoxLayout(self)
-        self.tabela = self._criar_tabela()
+        self.label = QLabel("Preencha as alíquotas nulas antes de prosseguir:")
+        layout.addWidget(self.label)
+
+        self.tabela = QTableWidget()
         layout.addWidget(self.tabela)
 
-        botoes_layout = QtWidgets.QHBoxLayout()
-        botoes_layout.addWidget(self._criar_botao("Gerar Planilha Modelo", self.gerar_planilha_modelo))
-        botoes_layout.addWidget(self._criar_botao("Importar Planilha", self.importar_planilha))
-        btn_salvar = self._criar_botao("Salvar Tudo", self.salvar_todas, "btn_salvar")
-        botoes_layout.addWidget(btn_salvar)
+        self.botao_salvar = QPushButton("Salvar Tudo")
+        self.botao_salvar.clicked.connect(self.salvar_dados)
+        layout.addWidget(self.botao_salvar)
 
-        layout.addLayout(botoes_layout)
+        self.carregar_dados()
 
-    def _criar_tabela(self):
-        tabela = QtWidgets.QTableWidget()
-        tabela.setColumnCount(4)
-        tabela.setHorizontalHeaderLabels(["Código", "Produto", "NCM", "Alíquota"])
-        tabela.setRowCount(len(self.dados))
+    def carregar_dados(self):
+        conexao = conectar_banco()
+        cursor = conexao.cursor()
 
-        for row, (codigo, produto, ncm) in enumerate(self.dados):
-            tabela.setItem(row, 0, QtWidgets.QTableWidgetItem(str(codigo)))
-            tabela.setItem(row, 1, QtWidgets.QTableWidgetItem(str(produto)))
-            tabela.setItem(row, 2, QtWidgets.QTableWidgetItem(str(ncm)))
-            combo = QtWidgets.QComboBox()
-            combo.addItems(self.aliquotas)
-            tabela.setCellWidget(row, 3, combo)
+        cursor.execute("""
+            SELECT id, codigo, produto, ncm, aliquota FROM cadastro_tributacao
+            WHERE empresa_id = %s AND (aliquota IS NULL OR aliquota = '')
+        """, (self.empresa_id,))
 
-        tabela.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        return tabela
+        dados = cursor.fetchall()
+        cursor.close()
+        fechar_banco(conexao)
 
-    def _criar_botao(self, texto, funcao, obj_name=None):
-        botao = QtWidgets.QPushButton(texto)
-        botao.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        botao.clicked.connect(funcao)
-        if obj_name:
-            botao.setObjectName(obj_name)
-        return botao
+        self.tabela.setRowCount(len(dados))
+        self.tabela.setColumnCount(5)
+        self.tabela.setHorizontalHeaderLabels(["ID", "Código", "Produto", "NCM", "Alíquota"])
+        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
-    def _aplicar_estilo(self):
-        self.setStyleSheet("""
-            QDialog { background-color: #030d18; }
-            QTableWidget { background-color: #ffffff; color: #000000; gridline-color: #cccccc; font-size: 14px; }
-            QHeaderView::section { background-color: #001F3F; color: white; padding: 4px; font-weight: bold; border: 1px solid #2E236C; }
-            QComboBox { background-color: #ffffff; color: #000000; }
-            QPushButton { padding: 6px 12px; font-size: 14px; border-radius: 5px; }
-            QPushButton:hover { background-color: #2E236C; color: white; }
-            QPushButton#btn_salvar { background-color: #28a745; color: white; }
-            QPushButton#btn_salvar:hover { background-color: #218838; }
-        """)
+        for row_idx, (id_, codigo, produto, ncm, aliquota) in enumerate(dados):
+            self.tabela.setItem(row_idx, 0, QTableWidgetItem(str(id_)))
+            self.tabela.setItem(row_idx, 1, QTableWidgetItem(codigo))
+            self.tabela.setItem(row_idx, 2, QTableWidgetItem(produto))
+            self.tabela.setItem(row_idx, 3, QTableWidgetItem(ncm))
+            item_aliquota = QTableWidgetItem(aliquota if aliquota else "")
+            item_aliquota.setFlags(item_aliquota.flags() | Qt.ItemIsEditable)
+            self.tabela.setItem(row_idx, 4, item_aliquota)
 
-    def salvar_todas(self):
-        dados_para_salvar = []
-        for row in range(self.tabela.rowCount()):
-            codigo = self.tabela.item(row, 0).text()
-            aliquota = self.tabela.cellWidget(row, 3).currentText()
-            if aliquota not in self.aliquotas:
-                mensagem_error(f"Alíquota inválida para o código {codigo}: {aliquota}")
-                return
-            dados_para_salvar.append((codigo, aliquota))
-
-        self.worker = WorkerSalvarAliquotas(dados_para_salvar, self.empresa_id)
-        self.worker.terminou.connect(self._executar_atualizacao)
-        self.worker.erro.connect(self._erro_salvar)
-        self.worker.start()
-
-    def _executar_atualizacao(self):
-        try:
-            executar_async(atualizar_aliquotas_e_resultado(self.empresa_id))
-            mensagem_sucesso("Alíquotas salvas e atualizadas com sucesso!")
-            self.accept()
-        except Exception as e:
-            mensagem_error(f"Erro ao atualizar resultados após salvar alíquotas: {e}")
-
-    def importar_planilha(self):
-        caminho, _ = QFileDialog.getOpenFileName(self, "Importar Planilha de Alíquotas", "", "Excel (*.xlsx *.xls)")
-        if not caminho:
-            return
+    def salvar_dados(self):
+        conexao = conectar_banco()
+        cursor = conexao.cursor()
 
         try:
-            df = pd.read_excel(caminho, dtype=str)
-            df.columns = [col.upper() for col in df.columns]
-
-            col_cod = next((c for c in df.columns if 'COD' in c), None)
-            col_aliq = next((c for c in df.columns if 'ALIQ' in c), None)
-
-            if not col_cod or not col_aliq:
-                mensagem_error("A planilha deve conter colunas semelhantes a 'CÓDIGO' e 'ALÍQUOTA'.")
-                return
-
-            cod_to_aliq = dict(zip(df[col_cod], df[col_aliq]))
-            preenchidos = 0
             for row in range(self.tabela.rowCount()):
-                codigo = self.tabela.item(row, 0).text()
-                if codigo in cod_to_aliq:
-                    valor = cod_to_aliq[codigo].strip().upper()
-                    combo = self.tabela.cellWidget(row, 3)
-                    index = combo.findText(valor)
-                    if index >= 0:
-                        combo.setCurrentIndex(index)
-                        preenchidos += 1
+                id_item = int(self.tabela.item(row, 0).text())
+                nova_aliquota = self.tabela.item(row, 4).text().strip()
+                cursor.execute("""
+                    UPDATE cadastro_tributacao
+                    SET aliquota = %s
+                    WHERE id = %s AND empresa_id = %s
+                """, (nova_aliquota, id_item, self.empresa_id))
 
-            mensagem_sucesso(f"Planilha importada com sucesso. {preenchidos} itens preenchidos.")
+            conexao.commit()
+            self.label.setText("Alíquotas atualizadas com sucesso.")
+            atualizar_aliquotas_e_resultado(self.empresa_id)
+            self.accept()
+
         except Exception as e:
-            mensagem_error(f"Erro ao importar planilha: {e}")
-
-    def gerar_planilha_modelo(self):
-        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Planilha Modelo", "modelo_aliquotas.xlsx", "Excel (*.xlsx)")
-        if not caminho:
-            return
-        try:
-            df = pd.DataFrame(self.dados, columns=["Codigo", "Produto", "NCM"])
-            df["Aliquota"] = ""
-            df.to_excel(caminho, index=False)
-            mensagem_sucesso("Planilha modelo gerada com sucesso!")
-        except Exception as e:
-            mensagem_error(f"Erro ao gerar planilha modelo: {e}")
-
-    def _erro_salvar(self, erro):
-        mensagem_error(f"Erro ao salvar alíquotas: {erro}")
+            conexao.rollback()
+            self.label.setText(f"Erro ao salvar: {e}")
+        finally:
+            cursor.close()
+            fechar_banco(conexao)

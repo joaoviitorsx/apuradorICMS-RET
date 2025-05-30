@@ -3,7 +3,7 @@ from services.fornecedorService import comparar_adicionar_atualizar_fornecedores
 from services.spedService.tributacao import criar_e_preencher_c170nova, atualizar_cadastro_tributacao
 from services.spedService.atualizacoes import atualizar_ncm, atualizar_aliquota, atualizar_aliquota_simples,atualizar_resultado, preencher_aliquota_c170_clone
 from services.spedService.clonagem import clonar_tabela_c170
-from services.spedService.verificacoes import verificar_e_preencher_aliquotas
+from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota
 
 async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     print(f"[POS] Iniciando etapas de pós-processamento para empresa_id={empresa_id}...")
@@ -20,7 +20,7 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     await atualizar_cadastro_tributacao(empresa_id)
     print("[POS] Tabela cadastro_tributacao atualizada com base em c170nova.")
 
-    verificar_e_preencher_aliquotas(empresa_id, janela_pai)
+    verificar_e_abrir_popup_aliquota(empresa_id, janela_pai)
 
     progress_bar.setValue(55)
     await clonar_tabela_c170(empresa_id)
