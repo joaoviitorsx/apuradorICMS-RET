@@ -90,12 +90,12 @@ def atualizar_cod_ncm_em_lotes(conexao, empresa_id, lote=1000):
 
 
 async def criar_e_preencher_c170nova(empresa_id):
+    import time
     print(f"[INÍCIO] Preenchendo c170nova para empresa_id={empresa_id}...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
     try:
-        # Inserção dos registros válidos em c170nova
         cursor.execute("""
             INSERT IGNORE INTO c170nova (
                 cod_item, periodo, reg, num_item, descr_compl, qtd, unid, vl_item, vl_desc,
@@ -104,13 +104,15 @@ async def criar_e_preencher_c170nova(empresa_id):
             SELECT DISTINCT 
                 c.cod_item, c.periodo, c.reg, c.num_item, c.descr_compl,
                 c.qtd, c.unid, c.vl_item, c.vl_desc, c.cfop, c.id_c100,
-                c.filial, c.ind_oper, c.cod_part, c.num_doc, c.chv_nfe, c.empresa_id
+                c.filial, c.ind_oper,
+                cc.cod_part, cc.num_doc, cc.chv_nfe, c.empresa_id
             FROM c170 c
+            JOIN c100 cc ON c.id_c100 = cc.id
             LEFT JOIN c170nova n ON c.cod_item = n.cod_item AND c.empresa_id = n.empresa_id
             JOIN (
                 SELECT cod_part FROM cadastro_fornecedores
                 WHERE decreto = 'Não' AND uf = 'CE' AND empresa_id = %s
-            ) f ON c.cod_part = f.cod_part
+            ) f ON cc.cod_part = f.cod_part
             WHERE c.empresa_id = %s
               AND c.cfop IN ('1101', '1102', '1116', '1401', '1403', '1910')
               AND n.cod_item IS NULL
@@ -120,12 +122,10 @@ async def criar_e_preencher_c170nova(empresa_id):
         conexao.commit()
         print(f"[OK] {total} registros inseridos em c170nova.")
 
-        # Atualização em lotes de descr_compl
         tempo_inicio = time.time()
         atualizar_descr_compl_em_lotes(conexao, empresa_id)
         print(f"[TEMPO] descr_compl finalizado em {time.time() - tempo_inicio:.2f}s")
 
-        # Atualização em lotes de cod_ncm
         tempo_inicio = time.time()
         atualizar_cod_ncm_em_lotes(conexao, empresa_id)
         print(f"[TEMPO] cod_ncm finalizado em {time.time() - tempo_inicio:.2f}s")
@@ -138,6 +138,7 @@ async def criar_e_preencher_c170nova(empresa_id):
         cursor.close()
         fechar_banco(conexao)
         print("[FIM] Finalização de c170nova.")
+
 
 async def atualizar_cadastro_tributacao(empresa_id):
     print(f"[INÍCIO] Atualizando cadastro_tributacao para empresa_id={empresa_id}...")
