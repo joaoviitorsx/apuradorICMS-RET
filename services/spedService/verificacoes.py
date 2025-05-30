@@ -2,7 +2,8 @@ from PySide6.QtWidgets import QApplication
 from db.conexao import conectar_banco, fechar_banco
 from ui.popupAliquota import PopupAliquota
 
-def verificar_e_abrir_popup_aliquota(empresa_id, parent=None):
+async def verificar_e_abrir_popup_aliquota(empresa_id, parent=None):
+    print(f"[INFO] Verificando alíquotas nulas para empresa_id={empresa_id}...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
