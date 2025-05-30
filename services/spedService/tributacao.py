@@ -1,4 +1,93 @@
+import time
 from db.conexao import conectar_banco, fechar_banco
+
+def atualizar_descr_compl_em_lotes(conexao, empresa_id, lote=1000):
+    cursor = conexao.cursor()
+    total_atualizados = 0
+    rodada = 0
+
+    print(f"[descr_compl] Iniciando atualização em lotes...")
+
+    try:
+        while True:
+            rodada += 1
+            print(f"  ➤ Lote {rodada}...")
+
+            cursor.execute(f"""
+                UPDATE c170nova n
+                JOIN (
+                    SELECT n.id, o.descr_item
+                    FROM c170nova n
+                    JOIN `0200` o ON n.cod_item = o.cod_item AND o.empresa_id = %s
+                    WHERE n.empresa_id = %s
+                      AND (n.descr_compl IS NULL OR TRIM(n.descr_compl) = '' OR n.descr_compl REGEXP '^[0-9]+$')
+                      AND n.descr_compl <> o.descr_item
+                    LIMIT {lote}
+                ) AS t ON n.id = t.id
+                SET n.descr_compl = t.descr_item
+            """, (empresa_id, empresa_id))
+
+            atualizados = cursor.rowcount
+            total_atualizados += atualizados
+            conexao.commit()
+
+            print(f"  ✔️ {atualizados} linhas atualizadas.")
+            if atualizados < lote:
+                break
+
+        print(f"[descr_compl] Total atualizado: {total_atualizados}")
+
+    except Exception as e:
+        print(f"[ERRO] descr_compl em lote: {e}")
+        conexao.rollback()
+
+    finally:
+        cursor.close()
+
+
+def atualizar_cod_ncm_em_lotes(conexao, empresa_id, lote=1000):
+    cursor = conexao.cursor()
+    total_atualizados = 0
+    rodada = 0
+
+    print(f"[cod_ncm] Iniciando atualização em lotes...")
+
+    try:
+        while True:
+            rodada += 1
+            print(f"  ➤ Lote {rodada}...")
+
+            cursor.execute(f"""
+                UPDATE c170nova n
+                JOIN (
+                    SELECT n.id, o.cod_ncm
+                    FROM c170nova n
+                    JOIN `0200` o ON n.cod_item = o.cod_item AND o.empresa_id = %s
+                    WHERE n.empresa_id = %s
+                      AND (n.cod_ncm IS NULL OR TRIM(n.cod_ncm) = '')
+                      AND o.cod_ncm IS NOT NULL AND TRIM(o.cod_ncm) <> ''
+                    LIMIT {lote}
+                ) AS t ON n.id = t.id
+                SET n.cod_ncm = t.cod_ncm
+            """, (empresa_id, empresa_id))
+
+            atualizados = cursor.rowcount
+            total_atualizados += atualizados
+            conexao.commit()
+
+            print(f"  ✔️ {atualizados} linhas atualizadas.")
+            if atualizados < lote:
+                break
+
+        print(f"[cod_ncm] Total atualizado: {total_atualizados}")
+
+    except Exception as e:
+        print(f"[ERRO] cod_ncm em lote: {e}")
+        conexao.rollback()
+
+    finally:
+        cursor.close()
+
 
 async def criar_e_preencher_c170nova(empresa_id):
     print(f"[INÍCIO] Preenchendo c170nova para empresa_id={empresa_id}...")
@@ -31,36 +120,24 @@ async def criar_e_preencher_c170nova(empresa_id):
         conexao.commit()
         print(f"[OK] {total} registros inseridos em c170nova.")
 
-        # Atualizar descr_compl se estiver vazia ou inválida
-        cursor.execute("""
-            UPDATE c170nova n
-            JOIN `0200` o ON n.cod_item = o.cod_item AND o.empresa_id = %s
-            SET n.descr_compl = o.descr_item
-            WHERE n.empresa_id = %s
-              AND (n.descr_compl IS NULL OR TRIM(n.descr_compl) = '' OR n.descr_compl REGEXP '^[0-9]+$')
-        """, (empresa_id, empresa_id))
-        print(f"[OK] descr_compl atualizada. Linhas afetadas: {cursor.rowcount}")
-        conexao.commit()
+        # Atualização em lotes de descr_compl
+        tempo_inicio = time.time()
+        atualizar_descr_compl_em_lotes(conexao, empresa_id)
+        print(f"[TEMPO] descr_compl finalizado em {time.time() - tempo_inicio:.2f}s")
 
-        # Atualizar cod_ncm se estiver vazio ou nulo
-        cursor.execute("""
-            UPDATE c170nova n
-            JOIN `0200` o ON n.cod_item = o.cod_item AND o.empresa_id = %s
-            SET n.cod_ncm = o.cod_ncm
-            WHERE n.empresa_id = %s
-              AND (n.cod_ncm IS NULL OR TRIM(n.cod_ncm) = '')
-        """, (empresa_id, empresa_id))
-        print(f"[OK] cod_ncm atualizado. Linhas afetadas: {cursor.rowcount}")
-        conexao.commit()
+        # Atualização em lotes de cod_ncm
+        tempo_inicio = time.time()
+        atualizar_cod_ncm_em_lotes(conexao, empresa_id)
+        print(f"[TEMPO] cod_ncm finalizado em {time.time() - tempo_inicio:.2f}s")
 
     except Exception as e:
         print(f"[ERRO] Falha em criar_e_preencher_c170nova: {e}")
         conexao.rollback()
+
     finally:
         cursor.close()
         fechar_banco(conexao)
         print("[FIM] Finalização de c170nova.")
-
 
 async def atualizar_cadastro_tributacao(empresa_id):
     print(f"[INÍCIO] Atualizando cadastro_tributacao para empresa_id={empresa_id}...")
@@ -68,7 +145,6 @@ async def atualizar_cadastro_tributacao(empresa_id):
     cursor = conexao.cursor()
 
     try:
-        # Inserir novos produtos na tabela cadastro_tributacao
         cursor.execute("""
             INSERT IGNORE INTO cadastro_tributacao (empresa_id, codigo, produto, ncm)
             SELECT %s, c.cod_item, c.descr_compl, c.ncm
