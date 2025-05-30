@@ -23,17 +23,19 @@ async def atualizar_ncm(empresa_id):
         fechar_banco(conexao)
 
 async def atualizar_aliquota(empresa_id):
-    print("[INÍCIO] Atualizando alíquotas em c170_clone...")
+    print("[INÍCIO] Atualizando alíquotas em c170_clone (por lote)...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
+
     try:
+        # Verificar tamanho da coluna aliquota
         cursor.execute("SHOW COLUMNS FROM c170_clone LIKE 'aliquota'")
         column_info = cursor.fetchone()
         max_length = int(column_info[1].split('(')[1].split(')')[0])
 
+        # Descobrir coluna correta com base no ano
         cursor.execute("SELECT dt_ini FROM `0000` WHERE empresa_id = %s ORDER BY id DESC LIMIT 1", (empresa_id,))
         row = cursor.fetchone()
-
         if not row or not row[0]:
             print("[AVISO] Nenhum dt_ini encontrado. Cancelando.")
             return
@@ -41,19 +43,45 @@ async def atualizar_aliquota(empresa_id):
         ano = int(row[0][4:]) if len(row[0]) >= 6 else 0
         coluna = "aliquota" if ano >= 2024 else "aliquota_antiga"
 
+        # Buscar as combinações cod_item + chv_nfe e as alíquotas da tributação
         cursor.execute(f"""
-            UPDATE c170_clone n
+            SELECT n.cod_item, n.chv_nfe, c.{coluna}
+            FROM c170_clone n
             JOIN cadastro_tributacao c ON n.cod_item = c.codigo AND c.empresa_id = %s
-            SET n.aliquota = LEFT(c.{coluna}, {max_length})
-            WHERE n.empresa_id = %s AND (n.aliquota IS NULL OR n.aliquota = '')
+            WHERE n.empresa_id = %s
+              AND (n.aliquota IS NULL OR n.aliquota = '')
               AND c.{coluna} IS NOT NULL AND c.{coluna} != ''
         """, (empresa_id, empresa_id))
-        conexao.commit()
 
-        print(f"[OK] Alíquotas atualizadas com '{coluna}' para empresa_id {empresa_id}.")
+        registros = cursor.fetchall()
+        if not registros:
+            print("[INFO] Nenhum registro a atualizar.")
+            return
+
+        # Preparar updates
+        updates = []
+        for cod_item, chv_nfe, aliquota in registros:
+            aliquota_limpa = str(aliquota)[:max_length]
+            updates.append((aliquota_limpa, cod_item, chv_nfe, empresa_id))
+
+        # Aplicar updates em lotes
+        update_sql = """
+            UPDATE c170_clone
+            SET aliquota = %s
+            WHERE cod_item = %s AND chv_nfe = %s AND empresa_id = %s
+        """
+        batch_size = 500
+        for i in range(0, len(updates), batch_size):
+            batch = updates[i:i+batch_size]
+            cursor.executemany(update_sql, batch)
+            conexao.commit()
+
+        print(f"[OK] Alíquotas atualizadas com '{coluna}' para empresa_id {empresa_id}. Registros afetados: {len(updates)}")
+
     except Exception as err:
         print(f"[ERRO] ao atualizar alíquotas: {err}")
         conexao.rollback()
+
     finally:
         cursor.close()
         fechar_banco(conexao)
@@ -116,3 +144,4 @@ async def atualizar_resultado(empresa_id):
         cursor.close()
         fechar_banco(conexao)
         print("[FIM] Finalização da atualização de resultado.")
+

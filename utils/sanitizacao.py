@@ -84,7 +84,7 @@ def corrigir_ind_mov(valor):
     
     valor_str = str(valor)
     if len(valor_str) > 1:
-        print(f"[TRUNCAR] ind_mov: '{valor_str}' → '{valor_str[:1]}'")
+        #print(f"[TRUNCAR] ind_mov: '{valor_str}' → '{valor_str[:1]}'")
         return valor_str[:1]
     
     return valor_str

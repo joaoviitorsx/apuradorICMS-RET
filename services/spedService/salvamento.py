@@ -19,17 +19,17 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
 
     dt_ini_0000 = None
     filial = None
-    ind_oper = cod_part = num_doc = chv_nfe = None
+    num_doc = None
+
+    mapa_documentos = {}
 
     def inserir_lote(sql, lote, descricao):
         if not lote: return
         try:
             cursor.executemany(sql, lote)
-            #print(f"[OK] {descricao}: {len(lote)} registros inseridos.")
             contadores["salvos"] += len(lote)
         except Exception as e:
             if "Duplicate entry" in str(e):
-                print(f"[WARN] Ignorando entradas duplicadas em {descricao}")
                 salvos = 0
                 for item in lote:
                     try:
@@ -82,6 +82,15 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
             elif linha.startswith("|C100|"):
                 partes += [None] * (29 - len(partes))
                 ind_oper, cod_part, num_doc, chv_nfe = partes[1], partes[4], partes[7], partes[9]
+
+                # Guardar mapeamento para uso em C170
+                if num_doc:
+                    mapa_documentos[num_doc] = {
+                        "ind_oper": ind_oper,
+                        "cod_part": cod_part,
+                        "chv_nfe": chv_nfe
+                    }
+
                 registro = [calcular_periodo(dt_ini_0000)] + partes + [filial, empresa_id]
                 lote_c100.append(registro)
                 contadores["C100"] += 1
@@ -89,11 +98,20 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
             elif linha.startswith("|C170|"):
                 partes += [None] * (39 - len(partes))
                 if len(partes) < 12: continue
-
                 if not num_doc:
                     print(f"[DEBUG CRÍTICO] num_doc indefinido antes do registro C170: linha={linha}")
                     continue
-                
+
+                # Buscar dados corretos de C100
+                dados_doc = mapa_documentos.get(num_doc)
+                if not dados_doc:
+                    print(f"[WARN] Documento {num_doc} não encontrado no mapa. Ignorando linha C170.")
+                    continue
+
+                ind_oper = dados_doc["ind_oper"]
+                cod_part = dados_doc["cod_part"]
+                chv_nfe = dados_doc["chv_nfe"]
+
                 partes[10] = corrigir_cst_icms(partes[10])
                 partes[6] = truncar(corrigir_unidade(partes[6]), TAMANHOS_MAXIMOS['unid'])
                 partes[9] = corrigir_ind_mov(partes[9])
@@ -160,7 +178,6 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                     continue
 
                 if not validar_estrutura_c170(dados):
-                    #print(f"[WARN] C170 inválido: {dados}")
                     continue
 
                 lote_c170.append(dados)
@@ -217,8 +234,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                 """, lote)
                 contadores["salvos"] += len(lote)
 
-                cursor.execute("SELECT COUNT(*) FROM c170 WHERE periodo = %s AND empresa_id = %s",
-                               (calcular_periodo(dt_ini_0000), empresa_id))
+                cursor.execute("SELECT COUNT(*) FROM c170 WHERE periodo = %s AND empresa_id = %s",(calcular_periodo(dt_ini_0000), empresa_id))
                 total_registros = cursor.fetchone()[0]
                 print(f"[DEBUG] Total de registros em c170 após inserção: {total_registros}")
             except Exception as e:

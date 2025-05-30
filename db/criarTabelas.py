@@ -170,7 +170,7 @@ def criar_tabelas_principais():
                 num_doc VARCHAR(20),
                 chv_nfe VARCHAR(60),
                 ncm VARCHAR(44) DEFAULT '',
-                MERCADO VARCHAR(15) DEFAULT '',
+                mercado VARCHAR(15) DEFAULT '',
                 aliquota VARCHAR(10) DEFAULT '',
                 resultado VARCHAR(20),
                 INDEX idx_empresa (empresa_id)
@@ -230,6 +230,8 @@ def criar_tabelas_principais():
                 aliquota VARCHAR(10),
                 resultado VARCHAR(20),
                 chavefinal VARCHAR(100),
+                nome VARCHAR(255),
+                cnpj VARCHAR(20),
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -263,6 +265,7 @@ def criar_tabelas_principais():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tributacao_codigo_empresa ON cadastro_tributacao (codigo, empresa_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_cod_item_empresa ON c170_clone (cod_item, empresa_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_0200_cod_item_empresa ON `0200` (cod_item, empresa_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170nova_cod_item_empresa ON c170nova (cod_item, empresa_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_codpart_empresa_periodo ON c170_clone (cod_part, empresa_id, periodo)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fornecedor_codpart_empresa ON cadastro_fornecedores (cod_part, empresa_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_empresa_periodo ON c170_clone (empresa_id, periodo)")

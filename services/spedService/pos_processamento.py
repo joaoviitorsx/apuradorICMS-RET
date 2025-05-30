@@ -49,7 +49,7 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     await atualizar_aliquota_simples(empresa_id, periodo)
     print("[POS] Alíquotas do Simples Nacional ajustadas.")
 
-    progress_bar.setValue(95)
+    progress_bar.setValue(90)
     await atualizar_resultado(empresa_id)
     print("[POS] Campo resultado calculado com base em vl_item e aliquota.")
 
