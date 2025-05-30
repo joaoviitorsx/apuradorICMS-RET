@@ -83,7 +83,6 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                 partes += [None] * (29 - len(partes))
                 ind_oper, cod_part, num_doc, chv_nfe = partes[1], partes[4], partes[7], partes[9]
 
-                # Guardar mapeamento para uso em C170
                 if num_doc:
                     mapa_documentos[num_doc] = {
                         "ind_oper": ind_oper,
@@ -92,8 +91,31 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                     }
 
                 registro = [calcular_periodo(dt_ini_0000)] + partes + [filial, empresa_id]
-                lote_c100.append(registro)
+
+                cursor.execute("""
+                    INSERT INTO c100 (
+                        periodo, reg, ind_oper, ind_emit, cod_part, cod_mod, cod_sit, ser, num_doc, chv_nfe,
+                        dt_doc, dt_e_s, vl_doc, ind_pgto, vl_desc, vl_abat_nt, vl_merc, ind_frt, vl_frt, vl_seg,
+                        vl_out_da, vl_bc_icms, vl_icms, vl_bc_icms_st, vl_icms_st, vl_ipi, vl_pis, vl_cofins,
+                        vl_pis_st, vl_cofins_st, filial, empresa_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s)
+                """, registro)
+
+                id_c100 = cursor.lastrowid
+
+                if num_doc:
+                    mapa_documentos[num_doc] = {
+                        "ind_oper": ind_oper,
+                        "cod_part": cod_part,
+                        "chv_nfe": chv_nfe,
+                        "id_c100": id_c100
+                    }
+
                 contadores["C100"] += 1
+
 
             elif linha.startswith("|C170|"):
                 partes += [None] * (39 - len(partes))
@@ -164,7 +186,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                     partes[36],                     # 37 vl_cofins
                     partes[37],                     # 38 cod_cta
                     partes[38],                     # 39 vl_abat_nt
-                    None,                           # 40 id_c100
+                    id_c100,                        # 40 id_c100
                     filial,                         # 41 filial
                     ind_oper,                       # 42 ind_oper
                     cod_part,                       # 43 cod_part
