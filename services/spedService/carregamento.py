@@ -23,7 +23,9 @@ def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, jan
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    result, mensagem_final = loop.run_until_complete(processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, janela))
+    result, mensagem_final = loop.run_until_complete(
+        processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, janela)
+    )
 
     print(f"[DEBUG] Thread de processamento SPED finalizada")
 
@@ -56,7 +58,10 @@ def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=N
     for i, caminho in enumerate(caminhos):
         print(f"[DEBUG]   {i+1}. {os.path.basename(caminho)} ({os.path.getsize(caminho)/1024:.1f} KB)")
 
-    thread = threading.Thread(target=processar_sped_thread, args=(empresa_id, progress_bar, label_arquivo, caminhos, janela, mensageiro))
+    thread = threading.Thread(
+        target=processar_sped_thread,
+        args=(empresa_id, progress_bar, label_arquivo, caminhos, janela, mensageiro)
+    )
     thread.start()
     print(f"[DEBUG] Thread de processamento SPED iniciada")
 
@@ -64,21 +69,21 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
     progress_bar.setValue(0)
     print(f"[DEBUG] Iniciando processamento de {len(caminhos)} arquivo(s) SPED...")
 
-    conexao = conectar_banco()
-    if not conexao:
+    conexao_cheque = conectar_banco()
+    if not conexao_cheque:
         return False, "Erro ao conectar ao banco"
 
-    cursor = conexao.cursor()
-    cursor.execute("SHOW TABLES LIKE 'cadastro_tributacao'")
-    if not cursor.fetchone():
-        cursor.close()
-        fechar_banco(conexao)
+    cursor_cheque = conexao_cheque.cursor()
+    cursor_cheque.execute("SHOW TABLES LIKE 'cadastro_tributacao'")
+    if not cursor_cheque.fetchone():
+        cursor_cheque.close()
+        fechar_banco(conexao_cheque)
         return False, "Tributação não encontrada. Envie primeiro a tributação."
-    cursor.close()
+    cursor_cheque.close()
+    fechar_banco(conexao_cheque)
 
     total = len(caminhos)
     progresso_por_arquivo = math.ceil(100 / total) if total > 0 else 100
-
     dados_gerais = []
 
     try:
@@ -87,7 +92,7 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
             label_arquivo.setText(f"Processando arquivo {i+1}/{total}: {nome_arquivo}")
 
             with open(caminho, 'r', encoding='utf-8', errors='ignore') as arquivo:
-                conteudo = arquivo.read()
+                conteudo = arquivo.read().strip()
 
             print(f"[DEBUG] Lendo: {nome_arquivo}")
             print(f"[DEBUG] Tamanho conteúdo bruto: {len(conteudo)}")
@@ -96,7 +101,7 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
             print(f"[DEBUG] Resultado process_data: Tipo={type(conteudo_processado)}, Tamanho={len(conteudo_processado) if isinstance(conteudo_processado, list) else 'N/A'}")
 
             if isinstance(conteudo_processado, str):
-                linhas = conteudo_processado.splitlines()
+                linhas = conteudo_processado.strip().splitlines()
             elif isinstance(conteudo_processado, list):
                 linhas = conteudo_processado
             else:
@@ -129,7 +134,10 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
         return False, f"Erro inesperado durante o processamento: {e}"
 
     finally:
-        fechar_banco(conexao)
+        try:
+            fechar_banco(conexao)
+        except:
+            pass
         progress_bar.setValue(100)
         await asyncio.sleep(0.5)
         progress_bar.setValue(0)
