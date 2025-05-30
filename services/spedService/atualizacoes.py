@@ -22,7 +22,7 @@ async def atualizar_ncm(empresa_id):
         cursor.close()
         fechar_banco(conexao)
 
-def atualizar_aliquota(empresa_id):
+async def atualizar_aliquota(empresa_id):
     print("[INÍCIO] Atualizando alíquotas em c170_clone...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
