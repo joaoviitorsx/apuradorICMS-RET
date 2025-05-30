@@ -230,8 +230,6 @@ def criar_tabelas_principais():
                 aliquota VARCHAR(10),
                 resultado VARCHAR(20),
                 chavefinal VARCHAR(100),
-                nome VARCHAR(255),
-                cnpj VARCHAR(20),
                 INDEX idx_empresa (empresa_id)
             )
         """)
