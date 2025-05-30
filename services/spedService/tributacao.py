@@ -108,14 +108,17 @@ async def criar_e_preencher_c170nova(empresa_id):
                 cc.cod_part, cc.num_doc, cc.chv_nfe, c.empresa_id
             FROM c170 c
             JOIN c100 cc ON c.id_c100 = cc.id
-            LEFT JOIN c170nova n ON c.cod_item = n.cod_item AND c.empresa_id = n.empresa_id
+            LEFT JOIN c170nova n 
+                ON c.cod_item = n.cod_item 
+                AND c.id_c100 = n.id_c100 
+                AND c.empresa_id = n.empresa_id
             JOIN (
                 SELECT cod_part FROM cadastro_fornecedores
                 WHERE decreto = 'Não' AND uf = 'CE' AND empresa_id = %s
             ) f ON cc.cod_part = f.cod_part
             WHERE c.empresa_id = %s
-              AND c.cfop IN ('1101', '1102', '1116', '1401', '1403', '1910')
-              AND n.cod_item IS NULL
+            AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
+            AND n.cod_item IS NULL
         """, (empresa_id, empresa_id))
 
         total = cursor.rowcount
