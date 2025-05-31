@@ -99,15 +99,17 @@ async def criar_e_preencher_c170nova(empresa_id):
         cursor.execute("""
             INSERT IGNORE INTO c170nova (
                 cod_item, periodo, reg, num_item, descr_compl, qtd, unid, vl_item, vl_desc,
-                cfop, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id
+                cfop, cst, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id, cod_ncm
             )
             SELECT DISTINCT 
                 c.cod_item, c.periodo, c.reg, c.num_item, c.descr_compl,
-                c.qtd, c.unid, c.vl_item, c.vl_desc, c.cfop, c.id_c100,
+                c.qtd, c.unid, c.vl_item, c.vl_desc, c.cfop, c.cst_icms, c.id_c100,
                 c.filial, c.ind_oper,
-                cc.cod_part, cc.num_doc, cc.chv_nfe, c.empresa_id
+                cc.cod_part, cc.num_doc, cc.chv_nfe, c.empresa_id,
+                o.cod_ncm
             FROM c170 c
             JOIN c100 cc ON c.id_c100 = cc.id
+            JOIN `0200`o ON c.cod_item = o.cod_item AND o.empresa_id = c.empresa_id
             LEFT JOIN c170nova n 
                 ON c.cod_item = n.cod_item 
                 AND c.id_c100 = n.id_c100 

@@ -1,6 +1,8 @@
 from mysql.connector import Error
 from db.conexao import conectar_banco, fechar_banco
 
+#32768826000191
+
 def criar_tabelas_principais():
     conexao = conectar_banco()
     if not conexao:
@@ -229,7 +231,6 @@ def criar_tabelas_principais():
                 chv_nfe VARCHAR(60),
                 aliquota VARCHAR(10),
                 resultado VARCHAR(20),
-                chavefinal VARCHAR(100),
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -244,10 +245,12 @@ def criar_tabelas_principais():
                 num_item VARCHAR(10),
                 descr_compl VARCHAR(255),
                 cod_ncm VARCHAR(40),
+                aliquota VARCHAR(10),
                 qtd VARCHAR(20),
                 unid VARCHAR(10),
                 vl_item VARCHAR(20),
                 vl_desc VARCHAR(20),
+                cst VARCHAR(10),
                 cfop VARCHAR(10),
                 id_c100 VARCHAR(10),
                 filial VARCHAR(10),
