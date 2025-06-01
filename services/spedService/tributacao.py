@@ -98,26 +98,30 @@ async def criar_e_preencher_c170nova(empresa_id):
     try:
         cursor.execute("""
             INSERT IGNORE INTO c170nova (
-                cod_item, periodo, reg, num_item, descr_compl, qtd, unid, vl_item, vl_desc,
-                cfop, cst, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id, cod_ncm
+                cod_item, periodo, reg, num_item, descr_compl, qtd, unid, 
+                vl_item, vl_desc, cfop, cst, id_c100, filial, ind_oper, 
+                cod_part, num_doc, chv_nfe, empresa_id
             )
-            SELECT DISTINCT 
-                c.cod_item, c.periodo, c.reg, c.num_item, c.descr_compl,
-                c.qtd, c.unid, c.vl_item, c.vl_desc, c.cfop, c.cst_icms, c.id_c100,
-                c.filial, c.ind_oper,
-                cc.cod_part, cc.num_doc, cc.chv_nfe, c.empresa_id,
-                o.cod_ncm
+            SELECT DISTINCT
+                c.cod_item, c.periodo, c.reg, c.num_item, c.descr_compl, 
+                c.qtd, c.unid, c.vl_item, c.vl_desc, c.cfop, c.cst_icms, 
+                c.id_c100, c.filial, c.ind_oper, cc.cod_part, cc.num_doc, 
+                cc.chv_nfe, c.empresa_id
             FROM c170 c
-            JOIN c100 cc ON c.id_c100 = cc.id
-            JOIN `0200`o ON c.cod_item = o.cod_item AND o.empresa_id = c.empresa_id
-            LEFT JOIN c170nova n 
-                ON c.cod_item = n.cod_item 
-                AND c.id_c100 = n.id_c100 
-                AND c.empresa_id = n.empresa_id
+            JOIN c100 cc 
+                ON cc.id = c.id_c100
+            JOIN `0200` o 
+                ON o.cod_item = c.cod_item AND o.empresa_id = c.empresa_id
+            JOIN cadastro_tributacao t 
+                ON t.ncm = o.cod_ncm AND t.empresa_id = c.empresa_id
             JOIN (
                 SELECT cod_part FROM cadastro_fornecedores
                 WHERE decreto = 'Não' AND uf = 'CE' AND empresa_id = %s
             ) f ON cc.cod_part = f.cod_part
+            LEFT JOIN c170nova n 
+                ON c.cod_item = n.cod_item 
+                AND c.id_c100 = n.id_c100 
+                AND c.empresa_id = n.empresa_id
             WHERE c.empresa_id = %s
             AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
             AND n.cod_item IS NULL
