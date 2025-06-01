@@ -245,7 +245,6 @@ def criar_tabelas_principais():
                 num_item VARCHAR(10),
                 descr_compl VARCHAR(255),
                 cod_ncm VARCHAR(40),
-                aliquota VARCHAR(10),
                 qtd VARCHAR(20),
                 unid VARCHAR(10),
                 vl_item VARCHAR(20),
