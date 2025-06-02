@@ -8,14 +8,14 @@ class Mensageiro(QObject):
 
 mensageiro = Mensageiro()
 
-BATCH_SIZE = 50  # Tamanho do lote de atualização
+BATCH_SIZE = 50
 
 async def comparar_adicionar_atualizar_fornecedores(empresa_id):
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
     try:
-        print("🔧 Verificando estrutura da tabela cadastro_fornecedores...")
+        print("Verificando estrutura da tabela cadastro_fornecedores")
         cursor.execute("""
             SHOW COLUMNS FROM cadastro_fornecedores
             WHERE Field IN ('cnae', 'decreto', 'uf', 'simples')
@@ -25,7 +25,7 @@ async def comparar_adicionar_atualizar_fornecedores(empresa_id):
             print("⚠️ Colunas obrigatórias não encontradas.")
             return
 
-        print("📦 Buscando fornecedores a adicionar...")
+        print("Buscando fornecedores a adicionar")
         cursor.execute("""
             SELECT f.cod_part, f.nome, f.cnpj
             FROM `0150` f
@@ -40,9 +40,9 @@ async def comparar_adicionar_atualizar_fornecedores(empresa_id):
                 VALUES (%s, %s, %s, %s, '', '', '', '')
             """, (empresa_id, cod_part, nome, cnpj))
         conexao.commit()
-        print(f"✅ {len(fornecedores)} fornecedores adicionados.")
+        print(f"{len(fornecedores)} fornecedores adicionados.")
 
-        print("📊 Buscando fornecedores com dados pendentes...")
+        print("Buscando fornecedores com dados pendentes.")
         cursor.execute("""
             SELECT cnpj
             FROM cadastro_fornecedores
@@ -52,13 +52,13 @@ async def comparar_adicionar_atualizar_fornecedores(empresa_id):
         cnpjs = [row[0] for row in cursor.fetchall()]
 
         if not cnpjs:
-            print("🔍 Nenhum CNPJ pendente de atualização.")
+            print("Nenhum CNPJ pendente de atualização.")
             return
 
-        print(f"🌐 Consultando dados externos para {len(cnpjs)} CNPJs...")
+        print(f"Consultando dados externos para {len(cnpjs)} CNPJs.")
         resultados = await processar_cnpjs(cnpjs)
 
-        print("🧠 Atualizando cadastro_fornecedores em lotes...")
+        print("Atualizando cadastro_fornecedores em lotes.")
         for i in range(0, len(cnpjs), BATCH_SIZE):
             batch = cnpjs[i:i + BATCH_SIZE]
             for cnpj in batch:
@@ -70,13 +70,13 @@ async def comparar_adicionar_atualizar_fornecedores(empresa_id):
                         WHERE cnpj = %s AND empresa_id = %s
                     """, (cnae, decreto, uf, simples, cnpj, empresa_id))
             conexao.commit()
-            print(f"✅ Lote de {len(batch)} CNPJs atualizado.")
+            print(f"Lote de {len(batch)} CNPJs atualizado.")
 
-        print("🏁 Atualização concluída com sucesso.")
+        print("Atualização concluída com sucesso.")
 
     except Exception as e:
         conexao.rollback()
-        print(f"❌ Erro durante atualização de fornecedores: {e}")
+        print(f"Erro durante atualização de fornecedores: {e}")
     finally:
         cursor.close()
         fechar_banco(conexao)
