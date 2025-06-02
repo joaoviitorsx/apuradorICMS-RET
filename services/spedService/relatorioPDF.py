@@ -3,32 +3,23 @@ from datetime import datetime
 from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QMessageBox
 
-class PDFPrompt(QMessageBox):
-    def __init__(self, empresa_id, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Salvar histórico em PDF?")
-        self.setText("Deseja salvar um PDF com os dados analisados antes da limpeza?")
-        self.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        self.setIcon(QMessageBox.Question)
-        self.empresa_id = empresa_id
-
-    def executar(self):
-        resposta = QMessageBox.question(
-            self.parent,
-            "Salvar histórico em PDF?",
-            "Deseja salvar um PDF com os dados analisados antes da limpeza?",
-            QMessageBox.Yes | QMessageBox.No
+def exibir_prompt_pdf_e_gerar(empresa_id, janela_pai):
+    resposta = QMessageBox.question(
+        janela_pai,
+        "Salvar histórico em PDF?",
+        "Deseja salvar um PDF com os dados analisados antes da limpeza?",
+        QMessageBox.Yes | QMessageBox.No
+    )
+    if resposta == QMessageBox.Yes:
+        nome_pdf = gerar_pdf_historico(empresa_id)
+        QMessageBox.information(
+            janela_pai,
+            "PDF gerado",
+            f"O histórico foi salvo como:\n{nome_pdf}"
         )
-        if resposta == QMessageBox.Yes:
-            self.nome_pdf = gerar_pdf_historico(self.empresa_id)
-            QMessageBox.information(
-                self.parent,
-                "PDF gerado",
-                f"O histórico foi salvo como:\n{self.nome_pdf}"
-            )
-            from services.spedService.limpeza import limpar_tabelas_temporarias
-            limpar_tabelas_temporarias(self.empresa_id)
-            print("[PDF] PDF gerado e tabelas temporárias limpas.")
+        from services.spedService.limpeza import limpar_tabelas_temporarias
+        limpar_tabelas_temporarias(empresa_id)
+        print("[PDF] PDF gerado e tabelas temporárias limpas.")
 
 class PDFHistorico(FPDF):
     def header(self):
