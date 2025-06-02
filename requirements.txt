@@ -1,6 +1,7 @@
 PySide6
 pandas
 openpyxl
-fpdf
+fpdf2
 mysql-connector-python
 aiohttp
+reportlab
