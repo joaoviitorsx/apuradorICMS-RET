@@ -1,10 +1,14 @@
 import asyncio
 from PySide6 import QtWidgets, QtGui, QtCore
+from PySide6.QtWidgets import QMessageBox, QDialog
 from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
+from services.spedService import sinal_popup
+from ui.popupAliquota import PopupAliquota
 from services.exportacaoService import exportar_resultado
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
+from services.spedService.verificacoes import sinal_popup, verificar_e_abrir_popup_aliquota
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa, empresa_id):
@@ -37,8 +41,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.progress_bar = QtWidgets.QProgressBar()
         self.layout.addWidget(self.progress_bar)
 
-        self._criar_seletor_mes_ano()
+        def abrir_popup_aliquota(empresa_id, janela_pai=None):
+            popup = PopupAliquota(empresa_id, janela_pai)
+            resultado = popup.exec()
+            sinal_popup.resultado_popup = resultado
+            if sinal_popup.event_loop and sinal_popup.event_loop.isRunning():
+                sinal_popup.event_loop.quit()
+                mensagem_aviso("Popup fechado, verifique as alíquotas preenchidas.", parent=janela_pai)
 
+        sinal_popup.abrir_popup_signal.connect(abrir_popup_aliquota)
+
+        self._criar_seletor_mes_ano()
+        
     def _setup_empresa_header(self):
         self.frame_db = QtWidgets.QGroupBox('Empresa')
         self.frame_layout = QtWidgets.QVBoxLayout(self.frame_db)
@@ -128,3 +142,4 @@ class MainWindow(QtWidgets.QMainWindow):
         self.progress_bar.setValue(0)
         exportar_resultado(self.empresa_id, mes, ano, self.progress_bar)
         self.progress_bar.setValue(0)
+
