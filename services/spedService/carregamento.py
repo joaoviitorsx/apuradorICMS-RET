@@ -11,6 +11,7 @@ from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from .salvamento import salvar_no_banco_em_lote
 from .pos_processamento import etapas_pos_processamento
 from services.fornecedorService import mensageiro as mensageiro_fornecedor
+from services.spedService.limpeza import limpar_tabelas_temporarias
 
 sem_limite = asyncio.Semaphore(3)
 
@@ -116,6 +117,8 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
 
         conexao = conectar_banco()
         cursor = conexao.cursor()
+
+        limpar_tabelas_temporarias(empresa_id)
 
         mensagem = await salvar_no_banco_em_lote(dados_gerais, cursor, conexao, empresa_id)
         conexao.commit()
