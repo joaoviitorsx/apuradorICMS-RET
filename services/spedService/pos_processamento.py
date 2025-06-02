@@ -2,11 +2,11 @@ from db.conexao import conectar_banco, fechar_banco
 from PySide6.QtWidgets import QMessageBox
 from services.fornecedorService import comparar_adicionar_atualizar_fornecedores
 from services.spedService.tributacao import criar_e_preencher_c170nova
-from services.spedService.atualizacoes import atualizar_ncm, atualizar_aliquota, atualizar_aliquota_simples,atualizar_resultado
+from services.spedService.atualizacoes import atualizar_ncm, atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado
 from services.spedService.clonagem import clonar_tabela_c170nova
 from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota, preencherTributacao
-from services.spedService.relatorioPDF import gerar_pdf_historico, PDFPrompt
 from services.spedService.limpeza import limpar_tabelas_temporarias
+from services.spedService.relatorioPDF import exibir_prompt_pdf_e_gerar
 
 async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     print(f"[POS] Iniciando etapas de pós-processamento para empresa_id={empresa_id}...")
@@ -33,7 +33,7 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
 
     await atualizar_aliquota(empresa_id)
     print("[POS] Alíquotas atualizadas na tabela c170_clone.")
-    
+
     conexao = conectar_banco()
     cursor = conexao.cursor()
     cursor.execute("SELECT dt_ini FROM `0000` WHERE empresa_id = %s ORDER BY id DESC LIMIT 1", (empresa_id,))
@@ -56,15 +56,4 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     print("[POS] Pós-processamento concluído.")
 
     if janela_pai:
-        prompt = PDFPrompt(empresa_id, janela_pai)
-        
-        prompt.exec()
-
-        if prompt.result() == QMessageBox.Yes:
-            nome_pdf = gerar_pdf_historico(empresa_id)
-            QMessageBox.information(janela_pai, "PDF gerado", f"O histórico foi salvo como:\n{nome_pdf}")
-            limpar_tabelas_temporarias(empresa_id)
-            print("[POS] Limpeza de tabelas temporárias concluída.")
-
-
-
+        exibir_prompt_pdf_e_gerar(empresa_id, janela_pai)
