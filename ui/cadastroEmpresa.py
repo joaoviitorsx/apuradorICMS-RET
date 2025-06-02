@@ -119,11 +119,19 @@ class CadastroEmpresaWorker(QtCore.QThread):
         try:
             conexao = conectar_banco()
             cursor = conexao.cursor()
+
+            cursor.execute("SELECT id FROM empresas WHERE cnpj = %s", (self.cnpj,))
+            if cursor.fetchone():
+                self.erro_ocorrido.emit("Empresa já cadastrada com este CNPJ.")
+                fechar_banco(conexao)
+                return
+
             cursor.execute("INSERT INTO empresas (cnpj, razao_social) VALUES (%s, %s)", (self.cnpj, self.razao))
             conexao.commit()
             cursor.close()
-            conexao.close()
+            fechar_banco(conexao)
             self.cadastro_finalizado.emit("Empresa cadastrada com sucesso.")
         except Exception as e:
             self.erro_ocorrido.emit(str(e))
+
 
