@@ -1,7 +1,20 @@
 from mysql.connector import Error
 from db.conexao import conectar_banco, fechar_banco
 
-#32768826000191
+def criar_indice_se_nao_existir(cursor, tabela, nome_indice, colunas):
+    cursor.execute(f"""
+        SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
+        WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = '{tabela}'
+        AND INDEX_NAME = '{nome_indice}'
+    """)
+    existe = cursor.fetchone()[0]
+    if not existe:
+        cursor.execute(f"CREATE INDEX {nome_indice} ON `{tabela}` ({colunas})")
+        return True
+    else:
+        print(f"[DB] Índice {nome_indice} já existe em {tabela}.")
+        return False
 
 def criar_tabelas_principais():
     conexao = conectar_banco()
@@ -261,19 +274,24 @@ def criar_tabelas_principais():
             )
         """)
 
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170_cod_item_empresa ON c170 (cod_item, empresa_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tributacao_codigo_empresa ON cadastro_tributacao (codigo, empresa_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_cod_item_empresa ON c170_clone (cod_item, empresa_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_0200_cod_item_empresa ON `0200` (cod_item, empresa_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170nova_cod_item_empresa ON c170nova (cod_item, empresa_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_codpart_empresa_periodo ON c170_clone (cod_part, empresa_id, periodo)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_fornecedor_codpart_empresa ON cadastro_fornecedores (cod_part, empresa_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_empresa_periodo ON c170_clone (empresa_id, periodo)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tributacao_empresa_aliquota ON cadastro_tributacao (empresa_id, aliquota)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_c170clone_aliquota_empresa ON c170_clone (empresa_id, aliquota)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_fornecedor_empresa_simples ON cadastro_fornecedores (empresa_id, simples)")
+        criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_cod_item_empresa', 'cod_item, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_codigo_empresa', 'codigo, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_cod_item_empresa', 'cod_item, empresa_id')
+        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_cod_item_empresa', 'cod_item, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_cod_item_empresa', 'cod_item, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_codpart_empresa_periodo', 'cod_part, empresa_id, periodo')
+        criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedor_codpart_empresa', 'cod_part, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_empresa_periodo', 'empresa_id, periodo')
+        criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_empresa_aliquota', 'empresa_id, aliquota')
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_aliquota_empresa', 'empresa_id, aliquota')
+        criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedor_empresa_simples', 'empresa_id, simples')
+        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_empresa_coditem_descr', 'empresa_id, cod_item, descr_item')
+        criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_empresa_coditem_descr', 'empresa_id, cod_item, descr_compl')
+        criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_chv_nfe', 'chv_nfe')
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_chv_nfe', 'chv_nfe')
+        criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_chv_nfe', 'chv_nfe')
 
-        cursor.execute("INSERT INTO cadastro_fornecedores(empresa_id, cod_part, nome, cnpj, uf, cnae, decreto, simples) VALUES (1, '55', null , null , 'CE', null , 'Não', null);")
+
         conexao.commit()
         print("[DB] Todas as tabelas criadas ou atualizadas com sucesso.")
 
