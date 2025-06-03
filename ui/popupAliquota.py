@@ -1,4 +1,5 @@
 import pandas as pd
+from unidecode import unidecode
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QHBoxLayout, QMessageBox
 from PySide6.QtCore import Qt
 from db.conexao import conectar_banco, fechar_banco
@@ -107,6 +108,7 @@ class PopupAliquota(QDialog):
             self.tabela.setItem(row_idx, 4, item_aliquota)
 
     def salvar_dados(self):
+        print("Salvando no banco")
         conexao = conectar_banco()
         cursor = conexao.cursor()
 
@@ -133,21 +135,34 @@ class PopupAliquota(QDialog):
             fechar_banco(conexao)
 
     def exportar_planilha_modelo(self):
-        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Planilha Modelo", "planilha_modelo.xlsx", "Arquivos Excel (*.xlsx)")
+        caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Planilha Modelo", "Tributacao.xlsx", "Arquivos Excel (*.xlsx)")
         if not caminho:
             return
 
         dados = []
         for row in range(self.tabela.rowCount()):
+            ncm_valor = self.tabela.item(row, 3).text().strip()
+            try:
+                if ncm_valor and ncm_valor.isdigit():
+                    ncm_valor = ncm_valor.zfill(8)
+            except:
+                pass
+                
             dados.append({
                 "Código": self.tabela.item(row, 1).text(),
                 "Produto": self.tabela.item(row, 2).text(),
-                "NCM": self.tabela.item(row, 3).text(),
+                "NCM": ncm_valor,
                 "Alíquota": self.tabela.item(row, 4).text()
             })
 
         df = pd.DataFrame(dados)
-        df.to_excel(caminho, index=False)
+        
+        with pd.ExcelWriter(caminho, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+            worksheet = writer.sheets['Sheet1']
+            for idx, _ in enumerate(df['NCM'], start=2):
+                cell = worksheet.cell(row=idx, column=4)
+                cell.number_format = '@'
 
         resposta = QMessageBox.question(
             self,
@@ -166,30 +181,98 @@ class PopupAliquota(QDialog):
             return
 
         try:
-            df = pd.read_excel(caminho)
-            colunas_normalizadas = {col.strip().lower().replace("ç", "c").replace("á", "a").replace("í", "i").replace("ú", "u"): col for col in df.columns}
-            
-            col_codigo = colunas_normalizadas.get("codigo")
-            col_aliquota = colunas_normalizadas.get("aliquota") or colunas_normalizadas.get("aliquota%") or colunas_normalizadas.get("aliquota icms")
+            df = pd.read_excel(caminho, dtype=str)
+
+            print(f"Colunas encontradas na planilha: {list(df.columns)}")
+
+            def normalizar(texto):
+                from unidecode import unidecode
+                return unidecode(str(texto)).strip().lower().replace(" ", "").replace("%", "")
+
+            colunas_norm = {normalizar(col): col for col in df.columns}
+            print(f"Colunas normalizadas: {colunas_norm}")
+
+            col_codigo = next((colunas_norm[c] for c in colunas_norm if "codigo" in c or "cod" in c), None)
+            col_aliquota = next((colunas_norm[c] for c in colunas_norm if "aliquota" in c), None)
+
+            print(f"Coluna de código identificada: {col_codigo}")
+            print(f"Coluna de alíquota identificada: {col_aliquota}")
 
             if not col_codigo or not col_aliquota:
-                QMessageBox.warning(self, "Importação falhou", "Colunas 'Código' e/ou 'Alíquota' não foram encontradas na planilha.")
+                QMessageBox.warning(self, "Importação falhou",
+                    f"Colunas 'Código' e/ou 'Alíquota' não encontradas na planilha.\n"
+                    f"Colunas disponíveis: {', '.join(df.columns)}")
                 return
 
-            codigos_planilha = df.set_index(col_codigo)[col_aliquota].dropna().to_dict()
+            codigos_planilha = df[[col_codigo, col_aliquota]].dropna()
+
+            codigos_dict = {}
+            erros_formato = []
+
+            valores_livres = {"isento", "insento", "st", "substituicao", "substituicao tributaria"}
+
+            for _, row in codigos_planilha.iterrows():
+                codigo_bruto = str(row[col_codigo]).strip()
+                aliquota_bruta = str(row[col_aliquota]).strip()
+
+                try:
+                    num = float(codigo_bruto)
+                    codigo = str(int(num)) if num.is_integer() else codigo_bruto
+                except ValueError:
+                    codigo = codigo_bruto
+
+                aliquota_normalizada = aliquota_bruta.lower().strip().replace(" ", "")
+
+                if aliquota_normalizada in valores_livres:
+                    codigos_dict[codigo] = aliquota_bruta.upper()
+                    continue
+
+                try:
+                    valor_check = aliquota_normalizada.replace("%", "").replace(",", ".")
+                    valor_num = float(valor_check)
+                
+                    if valor_num < 1:
+                        valor_formatado = f"{valor_num*100:.2f}%".replace(".", ",")
+                    else:
+                        valor_formatado = f"{valor_num:.2f}%".replace(".", ",")
+                    
+                    codigos_dict[codigo] = valor_formatado
+                except ValueError:
+                    erros_formato.append(f"'{codigo}': '{aliquota_bruta}'")
+
+            print(f"Dicionário de códigos/alíquotas: {codigos_dict}")
+            if erros_formato:
+                QMessageBox.warning(self, "Alíquotas com formato inválido",
+                    f"As seguintes alíquotas não puderam ser convertidas:\n"
+                    f"{', '.join(erros_formato[:10])}" +
+                    (f"\n(e mais {len(erros_formato)-10})" if len(erros_formato)>10 else ""))
 
             atualizados = 0
+            nao_encontrados = []
+
             for row in range(self.tabela.rowCount()):
                 item_codigo = self.tabela.item(row, 1)
                 item_aliquota = self.tabela.item(row, 4)
+
                 if item_codigo and item_aliquota:
-                    codigo = item_codigo.text()
-                    if codigo in codigos_planilha:
-                        novo_valor = str(codigos_planilha[codigo])
-                        item_aliquota.setText(novo_valor)
+                    codigo = str(item_codigo.text()).strip()
+                    if codigo in codigos_dict:
+                        item_aliquota.setText(codigos_dict[codigo])
                         atualizados += 1
+                    else:
+                        nao_encontrados.append(codigo)
 
-            QMessageBox.information(self, "Importação concluída", f"{atualizados} alíquotas atualizadas com sucesso.")
+            mensagem = f"{atualizados} alíquotas atualizadas com sucesso."
+            if nao_encontrados:
+                mensagem += f"\n\n{len(nao_encontrados)} códigos não encontrados na planilha."
+                if len(nao_encontrados) <= 10:
+                    mensagem += f"\nCódigos não encontrados: {', '.join(nao_encontrados)}"
+                else:
+                    mensagem += f"\nPrimeiros 10 códigos não encontrados: {', '.join(nao_encontrados[:10])}..."
+
+            QMessageBox.information(self, "Importação concluída", mensagem)
+
         except Exception as e:
-            QMessageBox.critical(self, "Erro ao importar", f"Ocorreu um erro ao importar a planilha:\n{e}")
-
+            import traceback
+            print(f"Erro detalhado: {traceback.format_exc()}")
+            QMessageBox.critical(self, "Erro ao importar", f"Ocorreu um erro ao importar a planilha:\n{str(e)}")
