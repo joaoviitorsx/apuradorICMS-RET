@@ -1,27 +1,5 @@
 from db.conexao import conectar_banco, fechar_banco
 
-async def atualizar_ncm(empresa_id):
-    print("[INÍCIO] Atualizando NCM em c170_clone...")
-    conexao = conectar_banco()
-    cursor = conexao.cursor()
-    try:
-        cursor.execute("""
-            UPDATE c170_clone n
-            JOIN `0200` c 
-              ON n.cod_item = c.cod_item AND c.empresa_id = %s
-            SET n.ncm = c.cod_ncm
-            WHERE n.empresa_id = %s AND (n.ncm IS NULL OR n.ncm = '')
-              AND c.cod_ncm IS NOT NULL AND c.cod_ncm != ''
-        """, (empresa_id, empresa_id))
-        conexao.commit()
-        print(f"[OK] NCM atualizado.")
-    except Exception as err:
-        print(f"[ERRO] ao atualizar NCM: {err}")
-        conexao.rollback()
-    finally:
-        cursor.close()
-        fechar_banco(conexao)
-
 async def atualizar_aliquota(empresa_id):
     print("[INÍCIO] Atualizando alíquotas em c170_clone...")
 
