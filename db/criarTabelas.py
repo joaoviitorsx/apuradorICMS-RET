@@ -138,7 +138,7 @@ def criar_tabelas_principais():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS c170 (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                empresa_id INT,
+                empresa_id INT NOT NULL,
                 periodo VARCHAR(10),
                 reg VARCHAR(10),
                 num_item VARCHAR(10),
@@ -290,7 +290,10 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_chv_nfe', 'chv_nfe')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_chv_nfe', 'chv_nfe')
         criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_chv_nfe', 'chv_nfe')
-
+        criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_empresa_cfop', 'empresa_id, cfop')
+        criar_indice_se_nao_existir(cursor, 'c100', 'idx_c100_id_codpart_empresa', 'id, cod_part, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedores_empresa_uf_decreto', 'empresa_id, uf, decreto')
+        criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_produto_ncm_empresa', 'produto, ncm, empresa_id')
 
         conexao.commit()
         print("[DB] Todas as tabelas criadas ou atualizadas com sucesso.")
