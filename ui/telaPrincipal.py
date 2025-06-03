@@ -8,7 +8,7 @@ from services.spedService import sinal_popup
 from ui.popupAliquota import PopupAliquota
 from services.exportacaoService import exportar_resultado
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-from services.spedService.verificacoes import sinal_popup, verificar_e_abrir_popup_aliquota
+from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa, empresa_id):
@@ -47,7 +47,6 @@ class MainWindow(QtWidgets.QMainWindow):
             sinal_popup.resultado_popup = resultado
             if sinal_popup.event_loop and sinal_popup.event_loop.isRunning():
                 sinal_popup.event_loop.quit()
-                mensagem_aviso("Popup fechado, verifique as alíquotas preenchidas.", parent=janela_pai)
 
         sinal_popup.abrir_popup_signal.connect(abrir_popup_aliquota)
 
