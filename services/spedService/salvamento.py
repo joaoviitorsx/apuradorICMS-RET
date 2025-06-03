@@ -20,6 +20,7 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
     dt_ini_0000 = None
     filial = None
     num_doc = None
+    ultimo_num_doc = None
 
     mapa_documentos = {}
 
@@ -83,13 +84,6 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                 partes += [None] * (29 - len(partes))
                 ind_oper, cod_part, num_doc, chv_nfe = partes[1], partes[4], partes[7], partes[9]
 
-                if num_doc:
-                    mapa_documentos[num_doc] = {
-                        "ind_oper": ind_oper,
-                        "cod_part": cod_part,
-                        "chv_nfe": chv_nfe
-                    }
-
                 registro = [calcular_periodo(dt_ini_0000)] + partes + [filial, empresa_id]
 
                 cursor.execute("""
@@ -113,86 +107,91 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                         "chv_nfe": chv_nfe,
                         "id_c100": id_c100
                     }
-
+                    ultimo_num_doc = num_doc
                 contadores["C100"] += 1
-
 
             elif linha.startswith("|C170|"):
                 partes += [None] * (39 - len(partes))
-                if len(partes) < 12: continue
-                if not num_doc:
-                    print(f"[DEBUG CRÍTICO] num_doc indefinido antes do registro C170: linha={linha}")
+                if len(partes) < 10:
                     continue
 
-                # Buscar dados corretos de C100
-                dados_doc = mapa_documentos.get(num_doc)
+                if not ultimo_num_doc:
+                    print(f"[DEBUG CRÍTICO] ultimo_num_doc indefinido antes do registro C170: linha={linha}")
+                    continue
+
+                dados_doc = mapa_documentos.get(ultimo_num_doc)
                 if not dados_doc:
-                    print(f"[WARN] Documento {num_doc} não encontrado no mapa. Ignorando linha C170.")
+                    print(f"[WARN] Documento {ultimo_num_doc} não encontrado no mapa. Ignorando linha C170.")
                     continue
 
                 ind_oper = dados_doc["ind_oper"]
                 cod_part = dados_doc["cod_part"]
                 chv_nfe = dados_doc["chv_nfe"]
+                id_c100 = dados_doc.get("id_c100")
 
-                partes[10] = corrigir_cst_icms(partes[10])
-                partes[6] = truncar(corrigir_unidade(partes[6]), TAMANHOS_MAXIMOS['unid'])
-                partes[9] = corrigir_ind_mov(partes[9])
-                partes[2] = truncar(partes[2], TAMANHOS_MAXIMOS['cod_item'])
-                partes[4] = truncar(partes[4], TAMANHOS_MAXIMOS['descr_compl'])
-                partes[12] = truncar(partes[12], TAMANHOS_MAXIMOS['cod_nat'])
-                partes[37] = truncar(partes[37], TAMANHOS_MAXIMOS['cod_cta'])
-
-                registro_id = f"{filial}_{num_doc}_{partes[2]}"
-                if registro_id in registros_processados:
+                if not id_c100:
+                    print(f"[WARN] id_c100 não encontrado para nota {ultimo_num_doc}. Ignorando C170.")
                     continue
 
+                num_item = partes[2]
+                cod_item = truncar(partes[3], TAMANHOS_MAXIMOS['cod_item'])
+                descr_compl = truncar(partes[4], TAMANHOS_MAXIMOS['descr_compl']) 
+                qtd = partes[5]
+                unid = truncar(corrigir_unidade(partes[6]), TAMANHOS_MAXIMOS['unid'])
+                vl_item = partes[7]
+                vl_desc = partes[8]
+                ind_mov = corrigir_ind_mov(partes[9])
+                cst_icms = corrigir_cst_icms(partes[10])
+                cfop = partes[11]
+                cod_nat = truncar(partes[37], TAMANHOS_MAXIMOS['cod_nat'])
+
                 dados = [
-                    calcular_periodo(dt_ini_0000),  # 1 periodo
-                    partes[0],                      # 2 reg
-                    partes[1],                      # 3 num_item
-                    partes[2],                      # 4 cod_item
-                    partes[4],                      # 5 descr_compl
-                    partes[5],                      # 6 qtd
-                    partes[6],                      # 7 unid
-                    partes[7],                      # 8 vl_item
-                    partes[8],                      # 9 vl_desc
-                    partes[9],                      # 10 ind_mov
-                    partes[10],                     # 11 cst_icms
-                    partes[11],                     # 12 cfop
-                    partes[12],                     # 13 cod_nat
-                    partes[13],                     # 14 vl_bc_icms
-                    partes[14],                     # 15 aliq_icms
-                    partes[15],                     # 16 vl_icms
-                    partes[16],                     # 17 vl_bc_icms_st
-                    partes[17],                     # 18 aliq_st
-                    partes[18],                     # 19 vl_icms_st
-                    partes[19],                     # 20 ind_apur
-                    partes[20],                     # 21 cst_ipi
-                    partes[21],                     # 22 cod_enq
-                    partes[22],                     # 23 vl_bc_ipi
-                    partes[23],                     # 24 aliq_ipi
-                    partes[24],                     # 25 vl_ipi
-                    partes[25],                     # 26 cst_pis
-                    partes[26],                     # 27 vl_bc_pis
-                    partes[27],                     # 28 aliq_pis
-                    partes[28],                     # 29 quant_bc_pis
-                    partes[29],                     # 30 aliq_pis_reais
-                    partes[30],                     # 31 vl_pis
-                    partes[31],                     # 32 cst_cofins
-                    partes[32],                     # 33 vl_bc_cofins
-                    partes[33],                     # 34 aliq_cofins
-                    partes[34],                     # 35 quant_bc_cofins
-                    partes[35],                     # 36 aliq_cofins_reais
-                    partes[36],                     # 37 vl_cofins
-                    partes[37],                     # 38 cod_cta
-                    partes[38],                     # 39 vl_abat_nt
-                    id_c100,                        # 40 id_c100
-                    filial,                         # 41 filial
-                    ind_oper,                       # 42 ind_oper
-                    cod_part,                       # 43 cod_part
-                    num_doc,                        # 44 num_doc
-                    chv_nfe,                        # 45 chv_nfe
-                    empresa_id                      # 46 empresa_id
+                    calcular_periodo(dt_ini_0000),  # periodo
+                    "C170",                         # reg fixo
+                    num_item,
+                    cod_item,
+                    descr_compl,
+                    qtd,
+                    unid,
+                    vl_item,
+                    vl_desc,
+                    ind_mov,
+                    cst_icms,
+                    cfop,
+                    cod_nat,
+                    partes[12],  # vl_bc_icms
+                    partes[13],  # aliq_icms
+                    partes[14],  # vl_icms
+                    partes[15],  # vl_bc_icms_st
+                    partes[16],  # aliq_st
+                    partes[17],  # vl_icms_st
+                    partes[18],  # ind_apur
+                    partes[19],  # cst_ipi
+                    partes[20],  # cod_enq
+                    partes[21],  # vl_bc_ipi
+                    partes[22],  # aliq_ipi
+                    partes[23],  # vl_ipi
+                    partes[24],  # cst_pis
+                    partes[25],  # vl_bc_pis
+                    partes[26],  # aliq_pis
+                    partes[27],  # quant_bc_pis
+                    partes[28],  # aliq_pis_reais
+                    partes[29],  # vl_pis
+                    partes[30],  # cst_cofins
+                    partes[31],  # vl_bc_cofins
+                    partes[32],  # aliq_cofins
+                    partes[33],  # quant_bc_cofins
+                    partes[34],  # aliq_cofins_reais
+                    partes[35],  # vl_cofins
+                    truncar(partes[36], TAMANHOS_MAXIMOS['cod_cta']),
+                    partes[37],  # vl_abat_nt
+                    id_c100,
+                    filial,
+                    ind_oper,
+                    cod_part,
+                    ultimo_num_doc,
+                    chv_nfe,
+                    empresa_id
                 ]
 
                 if len(dados) != 46:
@@ -200,6 +199,10 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                     continue
 
                 if not validar_estrutura_c170(dados):
+                    continue
+
+                registro_id = f"{filial}_{ultimo_num_doc}_{cod_item}"
+                if registro_id in registros_processados:
                     continue
 
                 lote_c170.append(dados)
@@ -247,11 +250,12 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                         vl_bc_cofins, aliq_cofins, quant_bc_cofins, aliq_cofins_reais, vl_cofins, cod_cta,
                         vl_abat_nt, id_c100, filial, ind_oper, cod_part, num_doc, chv_nfe, empresa_id
                     ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s
                     )
                 """, lote)
                 contadores["salvos"] += len(lote)
