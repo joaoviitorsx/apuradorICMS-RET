@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
 from PySide6.QtCore import QObject, Signal, QEventLoop
 from db.conexao import conectar_banco, fechar_banco
 from ui.popupAliquota import PopupAliquota
+from difflib import SequenceMatcher
 
 class SinalPopup(QObject):
     abrir_popup_signal = Signal(int, object)
@@ -40,45 +41,63 @@ async def verificar_e_abrir_popup_aliquota(empresa_id, janela_pai=None):
         print("[INFO] Nenhuma alíquota nula encontrada.")
 
 async def preencherTributacao(empresa_id, parent=None):
-    print(f"[VERIFICAÇÃO] Iniciando verificação e preenchimento de cadastro_tributacao com produtos da 0200 para empresa_id={empresa_id}...")
+    print(f"[VERIFICAÇÃO] Preenchendo cadastro_tributacao com produtos distintos (descrição + NCM) da empresa_id={empresa_id}...")
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
     try:
         cursor.execute("""
-            INSERT IGNORE INTO cadastro_tributacao (empresa_id, codigo, produto, ncm)
-            SELECT DISTINCT
-                o.empresa_id,
-                o.cod_item,
-                o.descr_item,
-                o.cod_ncm
-            FROM `0200` o
-            JOIN c170 c ON c.cod_item = o.cod_item AND c.empresa_id = o.empresa_id
-            JOIN c100 cc ON cc.id = c.id_c100
-            JOIN (
-                SELECT cod_part FROM cadastro_fornecedores
-                WHERE decreto = 'Não' AND uf = 'CE' AND empresa_id = %s
-            ) f ON cc.cod_part = f.cod_part
-            WHERE o.empresa_id = %s
-              AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
-              AND NOT EXISTS (
-                  SELECT 1 FROM cadastro_tributacao t
-                  WHERE t.codigo = o.cod_item AND t.empresa_id = o.empresa_id
-              )
-        """, (empresa_id, empresa_id))
+            INSERT IGNORE INTO cadastro_tributacao (
+                empresa_id, codigo, produto, ncm, aliquota, aliquota_antiga
+            )
+            SELECT 
+                sub.empresa_id,
+                MIN(sub.cod_item) AS codigo,
+                sub.produto,
+                sub.ncm,
+                NULL,
+                NULL
+            FROM (
+                SELECT 
+                    c.empresa_id,
+                    c.cod_item,
+                    p.descr_item AS produto,
+                    p.cod_ncm AS ncm
+                FROM c170 c
+                JOIN c100 cc 
+                    ON cc.id = c.id_c100
+                JOIN cadastro_fornecedores f 
+                    ON cc.cod_part = f.cod_part
+                    AND f.decreto = 'Não'
+                    AND f.uf = 'CE'
+                    AND f.empresa_id = c.empresa_id
+                LEFT JOIN `0200` p 
+                    ON c.cod_item = p.cod_item AND p.empresa_id = c.empresa_id
+                WHERE c.empresa_id = %s
+                  AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
+            ) AS sub
+            LEFT JOIN cadastro_tributacao ct
+              ON ct.empresa_id = sub.empresa_id 
+             AND ct.produto = sub.produto 
+             AND ct.ncm = sub.ncm
+            WHERE ct.id IS NULL
+            GROUP BY sub.empresa_id, sub.produto, sub.ncm
+        """, (empresa_id,))
 
         novos = cursor.rowcount
         conexao.commit()
-        print(f"[OK] {novos} novos produtos únicos inseridos na tabela cadastro_tributacao.")
+        print(f"[OK] {novos} produtos distintos inseridos na tabela cadastro_tributacao.")
 
     except Exception as e:
-        print(f"[ERRO] Falha durante verificação e preenchimento: {e}")
+        print(f"[ERRO] Falha ao preencher cadastro_tributacao: {e}")
         conexao.rollback()
 
     finally:
         cursor.close()
         fechar_banco(conexao)
-        print("[FIM] Verificação e preenchimento de cadastro_tributacao concluído.")
+        print("[FIM] Preenchimento de cadastro_tributacao concluído.")
+
+
 
 
 
