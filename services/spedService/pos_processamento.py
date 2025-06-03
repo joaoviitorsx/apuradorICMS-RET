@@ -1,11 +1,10 @@
+from PySide6.QtCore import QTimer
 from db.conexao import conectar_banco, fechar_banco
-from PySide6.QtWidgets import QMessageBox
 from services.fornecedorService import comparar_adicionar_atualizar_fornecedores
 from services.spedService.tributacao import criar_e_preencher_c170nova
-from services.spedService.atualizacoes import atualizar_ncm, atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado
+from services.spedService.atualizacoes import atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado
 from services.spedService.clonagem import clonar_tabela_c170nova
 from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota, preencherTributacao
-from services.spedService.limpeza import limpar_tabelas_temporarias
 from services.spedService.relatorioPDF import exibir_prompt_pdf_e_gerar
 
 async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
@@ -56,4 +55,4 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     print("[POS] Pós-processamento concluído.")
 
     if janela_pai:
-        exibir_prompt_pdf_e_gerar(empresa_id, janela_pai)
+        QTimer.singleShot(0, lambda: exibir_prompt_pdf_e_gerar(empresa_id, janela_pai))
