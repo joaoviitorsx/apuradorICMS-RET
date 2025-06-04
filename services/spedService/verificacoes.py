@@ -19,13 +19,20 @@ async def verificar_e_abrir_popup_aliquota(empresa_id, janela_pai=None):
 
     conexao = conectar_banco()
     cursor = conexao.cursor()
-    cursor.execute("""
-        SELECT COUNT(*) FROM cadastro_tributacao
-        WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
-    """, (empresa_id,))
-    count = cursor.fetchone()[0]
-    cursor.close()
-    fechar_banco(conexao)
+
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT MIN(codigo) AS codigo, produto, ncm
+                FROM cadastro_tributacao
+                WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
+                GROUP BY produto, ncm
+            ) AS sub
+        """, (empresa_id,))
+        count = cursor.fetchone()[0]
+    finally:
+        cursor.close()
+        fechar_banco(conexao)
 
     print("[INFO] Conexão com banco encerrada.")
 
@@ -40,6 +47,7 @@ async def verificar_e_abrir_popup_aliquota(empresa_id, janela_pai=None):
     else:
         print("[INFO] Nenhuma alíquota nula encontrada.")
 
+
 async def preencherTributacao(empresa_id, parent=None):
     print(f"[VERIFICAÇÃO] Preenchendo cadastro_tributacao com produtos distintos (descrição + NCM) da empresa_id={empresa_id}...")
     conexao = conectar_banco()
@@ -52,7 +60,7 @@ async def preencherTributacao(empresa_id, parent=None):
             )
             SELECT 
                 sub.empresa_id,
-                MIN(sub.cod_item) AS codigo,
+                sub.cod_item AS codigo,
                 sub.produto,
                 sub.ncm,
                 NULL,
@@ -64,29 +72,29 @@ async def preencherTributacao(empresa_id, parent=None):
                     p.descr_item AS produto,
                     p.cod_ncm AS ncm
                 FROM c170 c
-                JOIN c100 cc 
-                    ON cc.id = c.id_c100
+                JOIN c100 cc ON cc.id = c.id_c100
                 JOIN cadastro_fornecedores f 
                     ON cc.cod_part = f.cod_part
-                    AND f.decreto = 'Não'
-                    AND f.uf = 'CE'
-                    AND f.empresa_id = c.empresa_id
+                   AND f.decreto = 'Não'
+                   AND f.uf = 'CE'
+                   AND f.empresa_id = c.empresa_id
                 LEFT JOIN `0200` p 
                     ON c.cod_item = p.cod_item AND p.empresa_id = c.empresa_id
                 WHERE c.empresa_id = %s
                   AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
             ) AS sub
-            LEFT JOIN cadastro_tributacao ct
-              ON ct.empresa_id = sub.empresa_id 
-             AND ct.produto = sub.produto 
-             AND ct.ncm = sub.ncm
-            WHERE ct.id IS NULL
-            GROUP BY sub.empresa_id, sub.produto, sub.ncm
+            WHERE NOT EXISTS (
+                SELECT 1 FROM cadastro_tributacao ct
+                WHERE ct.empresa_id = sub.empresa_id
+                AND ct.codigo = sub.cod_item
+                AND ct.produto = sub.produto
+                AND ct.ncm = sub.ncm
+            )
         """, (empresa_id,))
 
         novos = cursor.rowcount
         conexao.commit()
-        print(f"[OK] {novos} produtos distintos inseridos na tabela cadastro_tributacao.")
+        print(f"[OK] {novos} códigos únicos inseridos na tabela cadastro_tributacao.")
 
     except Exception as e:
         print(f"[ERRO] Falha ao preencher cadastro_tributacao: {e}")
@@ -96,6 +104,7 @@ async def preencherTributacao(empresa_id, parent=None):
         cursor.close()
         fechar_banco(conexao)
         print("[FIM] Preenchimento de cadastro_tributacao concluído.")
+
 
 
 
