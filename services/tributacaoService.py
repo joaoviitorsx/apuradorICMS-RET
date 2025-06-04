@@ -5,46 +5,6 @@ from db.conexao import conectar_banco, fechar_banco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
 from ui.popupAliquota import PopupAliquota
-from utils.sanitizacao import atualizar_aliquotas_e_resultado
-
-COLUNAS_SINONIMAS = {
-    'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
-    'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
-    'NCM': ['ncm', 'cod_ncm', 'ncm_code'],
-    'ALIQUOTA': ['aliquota', 'alíquota', 'aliq', 'aliq_icms']
-}
-
-def normalizar_texto(texto):
-    return unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode().lower().replace('_', '').replace(' ', '')
-
-def mapear_colunas(df):
-    colunas_encontradas = {}
-    colunas_atuais = [col.lower().strip() for col in df.columns]
-
-    for coluna_padrao, sinonimos in COLUNAS_SINONIMAS.items():
-        for nome in sinonimos:
-            for col in df.columns:
-                if col.strip().lower() == nome.lower():
-                    colunas_encontradas[coluna_padrao] = col
-                    break
-            if coluna_padrao in colunas_encontradas:
-                break
-
-    colunas_necessarias = ['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA']
-    if all(col in colunas_encontradas for col in colunas_necessarias):
-        return colunas_encontradas
-
-    mensagem_error(f"Erro: Colunas esperadas não encontradas. Colunas atuais: {df.columns.tolist()}")
-    return None
-
-import pandas as pd
-import unicodedata
-from PySide6.QtWidgets import QFileDialog, QMessageBox
-from db.conexao import conectar_banco, fechar_banco
-from utils.aliquota import formatar_aliquota
-from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
-from ui.popupAliquota import PopupAliquota
-from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
@@ -147,7 +107,6 @@ def enviar_tributacao(empresa_id, progress_bar):
             """, [(p, n, a, c, e) for (e, c, p, n, a) in atualizacoes])
             print(f"[DEBUG] {len(atualizacoes)} registros atualizados.")
 
-        # Atualiza coluna de alíquota antiga
         cursor.execute("""
             UPDATE cadastro_tributacao 
             SET aliquota_antiga = CASE
