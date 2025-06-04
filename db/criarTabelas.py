@@ -235,7 +235,6 @@ def criar_tabelas_principais():
                 num_item VARCHAR(10),
                 cod_item VARCHAR(60),
                 descr_compl VARCHAR(255),
-                qtdDoc VARCHAR(20),
                 qtd VARCHAR(20),
                 unid VARCHAR(10),
                 vl_item VARCHAR(20),
@@ -284,7 +283,7 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_codigo_empresa', 'codigo, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_cod_item_empresa', 'cod_item, empresa_id')
-        criar_indice_se_nao_existir(cursor, '`0200`', 'idx_0200_cod_item_empresa', 'cod_item, empresa_id')
+        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_codpart_empresa_periodo', 'cod_part, empresa_id, periodo')
         criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedor_codpart_empresa', 'cod_part, empresa_id')
@@ -292,7 +291,7 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_empresa_aliquota', 'empresa_id, aliquota')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_aliquota_empresa', 'empresa_id, aliquota')
         criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedor_empresa_simples', 'empresa_id, simples')
-        criar_indice_se_nao_existir(cursor, '`0200`', 'idx_0200_empresa_coditem_descr', 'empresa_id, cod_item, descr_item')
+        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_empresa_coditem_descr', 'empresa_id, cod_item, descr_item')
         criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_empresa_coditem_descr', 'empresa_id, cod_item, descr_compl')
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_chv_nfe', 'chv_nfe')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_chv_nfe', 'chv_nfe')
