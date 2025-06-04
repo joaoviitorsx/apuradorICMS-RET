@@ -1,12 +1,14 @@
+import os
 import asyncio
 from PySide6 import QtWidgets, QtGui, QtCore
-from PySide6.QtWidgets import QMessageBox, QDialog
+from PySide6.QtWidgets import QMessageBox, QDialog, QFileDialog
 from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
+from services.exportacaoService import ExportWorker
 from services.spedService import sinal_popup
 from ui.popupAliquota import PopupAliquota
-from services.exportacaoService import exportar_resultado
+from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota
 
@@ -138,7 +140,44 @@ class MainWindow(QtWidgets.QMainWindow):
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
 
+        conexao = conectar_banco()
+        if not conexao:
+            mensagem_error("Não foi possível conectar ao banco de dados.")
+            return
+
+        try:
+            cursor = conexao.cursor()
+            cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (self.empresa_id,))
+            resultado = cursor.fetchone()
+            nome_empresa = resultado[0] if resultado else "empresa"
+        finally:
+            fechar_banco(conexao)
+
+        sugestao_nome = f"{ano}-{mes}-{nome_empresa}.xlsx"
+
+        caminho_arquivo, _ = QFileDialog.getSaveFileName(self, "Salvar Resultado", sugestao_nome, "Planilhas Excel (*.xlsx)")
+        if not caminho_arquivo:
+            mensagem_aviso("Exportação cancelada pelo usuário.")
+            return
+
         self.progress_bar.setValue(0)
-        exportar_resultado(self.empresa_id, mes, ano, self.progress_bar)
+        self.export_worker = ExportWorker(self.empresa_id, mes, ano, caminho_arquivo)
+        self.export_worker.progress.connect(self.progress_bar.setValue)
+        self.export_worker.finished.connect(self._exportacao_concluida)
+        self.export_worker.erro.connect(lambda msg: mensagem_error(msg))
+        self.export_worker.start()
+
+    def _exportacao_concluida(self, caminho_arquivo):
+        mensagem_sucesso(f"Exportação concluída com sucesso!\n{caminho_arquivo}")
+
+        abrir = QMessageBox.question(
+            self,
+            "Abrir Arquivo",
+            "Deseja abrir a planilha exportada?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if abrir == QMessageBox.Yes and os.path.exists(caminho_arquivo):
+            os.startfile(caminho_arquivo)
+
         self.progress_bar.setValue(0)
 
