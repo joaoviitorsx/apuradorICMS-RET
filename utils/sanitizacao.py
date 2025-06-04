@@ -230,43 +230,4 @@ def is_aliquota_valida(valor: str) -> bool:
     except ValueError:
         return False
 
-def atualizar_aliquotas_e_resultado(empresa_id):
-    import asyncio
-    from services.spedService.atualizacoes import atualizar_aliquota, atualizar_resultado
-    from db.conexao import conectar_banco, fechar_banco
-
-    async def _executar():
-        conexao = conectar_banco()
-        cursor = conexao.cursor()
-        cursor.execute("""
-            SELECT dt_ini FROM `0000`
-            WHERE empresa_id = %s
-            ORDER BY id DESC LIMIT 1
-        """, (empresa_id,))
-        row = cursor.fetchone()
-        cursor.close()
-        fechar_banco(conexao)
-
-        if row is not None and row[0] and isinstance(row[0], str) and len(row[0]) >= 6:
-            dt_ini = row[0]
-            periodo = f"{dt_ini[2:4]}/{dt_ini[4:]}"
-            print(f"[DEBUG] Período obtido: {periodo}")
-            await atualizar_aliquota(empresa_id)
-            await atualizar_resultado(empresa_id)
-        else:
-            print("[INFO] Nenhum período válido encontrado. SPED ainda não foi processado.")
-
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_executar())
-        else:
-            loop.run_until_complete(_executar())
-    except RuntimeError:
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-        new_loop.run_until_complete(_executar())
-        new_loop.close()
-    except Exception as e:
-        print(f"[ERRO] Falha ao atualizar alíquotas e resultados: {e}")
 
