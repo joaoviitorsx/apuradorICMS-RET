@@ -1,20 +1,26 @@
 from mysql.connector import Error
 from db.conexao import conectar_banco, fechar_banco
 
-def criar_indice_se_nao_existir(cursor, tabela, nome_indice, colunas):
+def criar_indice_se_nao_existir(cursor, nome_tabela, nome_indice, colunas, unique=False):
     cursor.execute(f"""
-        SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
-        WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = '{tabela}'
-        AND INDEX_NAME = '{nome_indice}'
-    """)
+        SELECT COUNT(*) 
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = %s
+          AND index_name = %s
+    """, (nome_tabela, nome_indice))
+    
     existe = cursor.fetchone()[0]
     if not existe:
-        cursor.execute(f"CREATE INDEX {nome_indice} ON `{tabela}` ({colunas})")
-        return True
+        tipo = "UNIQUE INDEX" if unique else "INDEX"
+        print(f"[INFO] Criando {tipo} '{nome_indice}' em '{nome_tabela}'...")
+        cursor.execute(f"""
+            ALTER TABLE {nome_tabela}
+            ADD {tipo} {nome_indice} ({colunas})
+        """)
     else:
-        print(f"[DB] Índice {nome_indice} já existe em {tabela}.")
-        return False
+        print(f"[DB] Índice {nome_indice} já existe em {nome_tabela}.")
+
 
 def criar_tabelas_principais():
     conexao = conectar_banco()
@@ -229,6 +235,7 @@ def criar_tabelas_principais():
                 num_item VARCHAR(10),
                 cod_item VARCHAR(60),
                 descr_compl VARCHAR(255),
+                qtdDoc VARCHAR(20),
                 qtd VARCHAR(20),
                 unid VARCHAR(10),
                 vl_item VARCHAR(20),
@@ -277,7 +284,7 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_codigo_empresa', 'codigo, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_cod_item_empresa', 'cod_item, empresa_id')
-        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_cod_item_empresa', 'cod_item, empresa_id')
+        criar_indice_se_nao_existir(cursor, '`0200`', 'idx_0200_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_codpart_empresa_periodo', 'cod_part, empresa_id, periodo')
         criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedor_codpart_empresa', 'cod_part, empresa_id')
@@ -285,7 +292,7 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_empresa_aliquota', 'empresa_id, aliquota')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_aliquota_empresa', 'empresa_id, aliquota')
         criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedor_empresa_simples', 'empresa_id, simples')
-        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_empresa_coditem_descr', 'empresa_id, cod_item, descr_item')
+        criar_indice_se_nao_existir(cursor, '`0200`', 'idx_0200_empresa_coditem_descr', 'empresa_id, cod_item, descr_item')
         criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_empresa_coditem_descr', 'empresa_id, cod_item, descr_compl')
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_chv_nfe', 'chv_nfe')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_chv_nfe', 'chv_nfe')
@@ -294,7 +301,10 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'c100', 'idx_c100_id_codpart_empresa', 'id, cod_part, empresa_id')
         criar_indice_se_nao_existir(cursor, 'cadastro_fornecedores', 'idx_fornecedores_empresa_uf_decreto', 'empresa_id, uf, decreto')
         criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_produto_ncm_empresa', 'produto, ncm, empresa_id')
-
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_produto_ncm_empresa', 'descr_compl, ncm, empresa_id')
+        criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_empresa_produto_ncm_aliquota', 'empresa_id, descr_compl, ncm, aliquota')
+        criar_indice_se_nao_existir(cursor,'cadastro_tributacao','uniq_empresa_codigo_produto_ncm','empresa_id, codigo, produto(255), ncm',unique=True)
+            
         conexao.commit()
         print("[DB] Todas as tabelas criadas ou atualizadas com sucesso.")
 
