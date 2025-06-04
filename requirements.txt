@@ -6,3 +6,4 @@ mysql-connector-python
 aiohttp
 reportlab
 unidecode
+xlsxWriter
