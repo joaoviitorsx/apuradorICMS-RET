@@ -15,7 +15,7 @@ async def criar_e_preencher_c170nova(empresa_id):
                 vl_item, vl_desc, cfop, cst, id_c100, filial, ind_oper, 
                 cod_part, num_doc, chv_nfe, empresa_id, cod_ncm
             )
-            SELECT 
+            SELECT DISTINCT
                 c.cod_item, 
                 c.periodo, 
                 c.reg, 
