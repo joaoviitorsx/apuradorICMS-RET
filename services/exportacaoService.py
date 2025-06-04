@@ -1,107 +1,110 @@
 import os
-import re
-import asyncio
-import pandas as pd
-from pathlib import Path
-from datetime import datetime
+import time
+import xlsxwriter
+from PySide6.QtCore import QThread, Signal
 from ui.popupAliquota import PopupAliquota
 from db.conexao import conectar_banco, fechar_banco
-from PySide6.QtWidgets import QFileDialog, QMessageBox
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
-from utils.sanitizacao import is_aliquota_valida, atualizar_aliquotas_e_resultado
-from services.spedService.atualizacoes import atualizar_aliquota, atualizar_resultado
-from services.tributacaoService import atualizar_aliquota_c170_clone
 
-def exportar_resultado(empresa_id, mes, ano, progress_bar):
-    print(f"[DEBUG] Exportando resultado para {mes}/{ano} para empresa_id={empresa_id}")
-    try:
-        progress_bar.setValue(5)
-        periodo = f"{int(mes):02d}/{ano}"
+class ExportWorker(QThread):
+    progress = Signal(int)
+    finished = Signal(str)
+    erro = Signal(str)
 
-        conexao = conectar_banco()
-        if not conexao:
-            mensagem_error("Não foi possível conectar ao banco de dados.")
-            return
-        cursor = conexao.cursor()
+    def __init__(self, empresa_id, mes, ano, caminho_arquivo):
+        super().__init__()
+        self.empresa_id = empresa_id
+        self.mes = mes
+        self.ano = ano
+        self.caminho_arquivo = caminho_arquivo
 
-        cursor.execute("""
-            SELECT codigo, produto, ncm 
-            FROM cadastro_tributacao 
-            WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
-        """, (empresa_id,))
-        produtos_nulos = cursor.fetchall()
+    def run(self):
+        try:
+            self.progress.emit(5)
+            periodo = f"{int(self.mes):02d}/{self.ano}"
 
-        if produtos_nulos:
-            popup = PopupAliquota(produtos_nulos, empresa_id)
-            resultado = popup.exec()
-            if resultado != 1:
-                mensagem_aviso("Preenchimento de alíquotas cancelado.")
+            conexao = conectar_banco()
+            if not conexao:
+                self.erro.emit("Não foi possível conectar ao banco de dados.")
+                return
+            cursor = conexao.cursor()
+
+            cursor.execute("""
+                SELECT codigo, produto, ncm 
+                FROM cadastro_tributacao 
+                WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
+            """, (self.empresa_id,))
+            produtos_nulos = cursor.fetchall()
+
+            if produtos_nulos:
+                self.erro.emit("Existem produtos com alíquotas nulas. Preencha antes de exportar.")
                 return
 
-        cursor.execute("""
-            SELECT c.*, IFNULL(f.nome, '') AS nome, IFNULL(f.cnpj, '') AS cnpj 
-            FROM c170_clone c 
-            LEFT JOIN `0150` f ON f.cod_part = c.cod_part AND f.empresa_id = c.empresa_id
-            WHERE c.periodo = %s AND c.empresa_id = %s
-        """, (periodo, empresa_id))
-        dados = cursor.fetchall()
+            cursor.execute("""
+                SELECT c.*, IFNULL(f.nome, '') AS nome, IFNULL(f.cnpj, '') AS cnpj 
+                FROM c170_clone c 
+                LEFT JOIN `0150` f ON f.cod_part = c.cod_part AND f.empresa_id = c.empresa_id
+                WHERE c.periodo = %s AND c.empresa_id = %s
+            """, (periodo, self.empresa_id))
+            dados = cursor.fetchall()
 
-        if not dados:
-            mensagem_aviso("Não existem dados para o mês e ano selecionados.")
-            return
+            if not dados:
+                self.erro.emit("Não existem dados para o mês e ano selecionados.")
+                return
 
-        colunas = [desc[0] for desc in cursor.description]
-        df = pd.DataFrame(dados, columns=colunas)
+            colunas = [desc[0] for desc in cursor.description]
 
-        for campo in ['resultado', 'vl_item', 'aliquota']:
-            if campo in df.columns:
-                df[campo] = df[campo].astype(str).str.replace('.', ',', regex=False)
-        if 'aliquota' in df.columns:
-            df['aliquota'] = df['aliquota'].apply(lambda x: x if is_aliquota_valida(x) else '')
+            cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (self.empresa_id,))
+            nome_empresa_result = cursor.fetchone()
+            nome_empresa = nome_empresa_result[0] if nome_empresa_result else "empresa"
 
-        cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (empresa_id,))
-        nome_empresa_result = cursor.fetchone()
-        nome_empresa = nome_empresa_result[0] if nome_empresa_result else "empresa"
+            cursor.execute("SELECT periodo, dt_ini, dt_fin FROM `0000` WHERE empresa_id = %s AND periodo = %s LIMIT 1", (self.empresa_id, periodo))
+            resultado = cursor.fetchone()
+            if not resultado:
+                self.erro.emit("Período não encontrado na tabela 0000.")
+                return
+            _, dt_ini, dt_fin = resultado
 
-        cursor.execute("SELECT periodo, dt_ini, dt_fin FROM `0000` WHERE empresa_id = %s AND periodo = %s LIMIT 1", (empresa_id, periodo))
-        resultado = cursor.fetchone()
-        if not resultado:
-            mensagem_error("Período não encontrado na tabela 0000.")
-            return
-        _, dt_ini, dt_fin = resultado
+            caminho_arquivo = self.caminho_arquivo
 
-        sugestao_nome = f"{ano}-{mes}-{nome_empresa}.xlsx"
-        caminho_arquivo, _ = QFileDialog.getSaveFileName(None, "Salvar Resultado", sugestao_nome, "Planilhas Excel (*.xlsx)")
-        if not caminho_arquivo:
-            mensagem_aviso("Exportação cancelada pelo usuário.")
-            return
+            self.progress.emit(60)
 
-        progress_bar.setValue(60)
+            dt_ini_fmt = f"{dt_ini[:2]}/{dt_ini[2:4]}/{dt_ini[4:]}"
+            dt_fin_fmt = f"{dt_fin[:2]}/{dt_fin[2:4]}/{dt_fin[4:]}"
+            periodo_legivel = f"Período: {dt_ini_fmt} a {dt_fin_fmt}"
 
-        dt_ini_fmt = f"{dt_ini[:2]}/{dt_ini[2:4]}/{dt_ini[4:]}"
-        dt_fin_fmt = f"{dt_fin[:2]}/{dt_fin[2:4]}/{dt_fin[4:]}"
-        periodo_legivel = f"Período: {dt_ini_fmt} a {dt_fin_fmt}"
+            start_time = time.time()
 
-        with pd.ExcelWriter(caminho_arquivo, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, startrow=2)
-            sheet = writer.book.active
-            sheet["A1"] = nome_empresa
-            sheet["A2"] = periodo_legivel
+            workbook = xlsxwriter.Workbook(caminho_arquivo)
+            worksheet = workbook.add_worksheet()
 
-        progress_bar.setValue(100)
-        mensagem_sucesso(f"Tabela exportada com sucesso para:\n{caminho_arquivo}")
+            worksheet.write('A1', nome_empresa)
+            worksheet.write('A2', periodo_legivel)
 
-        abrir = QMessageBox.question(
-            None, "Abrir Arquivo", "Deseja abrir a planilha exportada?", QMessageBox.Yes | QMessageBox.No
-        )
-        if abrir == QMessageBox.Yes:
-            os.startfile(caminho_arquivo)
+            for col_idx, col_name in enumerate(colunas):
+                worksheet.write(2, col_idx, col_name)
 
-    except Exception as e:
-        mensagem_error(f"Erro ao exportar: {e}")
-    finally:
-        try:
-            cursor.close()
-            fechar_banco(conexao)
-        except:
-            pass
+            for row_idx, row in enumerate(dados, start=3):
+                for col_idx, valor in enumerate(row):
+                    worksheet.write(row_idx, col_idx, valor)
+
+                if row_idx % 10000 == 0:
+                    progresso = min(95, 60 + int(row_idx / len(dados) * 40))
+                    self.progress.emit(progresso)
+
+            workbook.close()
+
+            tempo_total = time.time() - start_time
+            print(f"[DEBUG] Exportação concluída em {tempo_total:.2f} segundos")
+
+            self.progress.emit(100)
+            self.finished.emit(caminho_arquivo)
+
+        except Exception as e:
+            self.erro.emit(f"Erro ao exportar: {e}")
+        finally:
+            try:
+                cursor.close()
+                fechar_banco(conexao)
+            except:
+                pass
