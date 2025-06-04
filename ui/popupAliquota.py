@@ -3,7 +3,6 @@ from unidecode import unidecode
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QHBoxLayout, QMessageBox
 from PySide6.QtCore import Qt
 from db.conexao import conectar_banco, fechar_banco
-from utils.sanitizacao import atualizar_aliquotas_e_resultado
 
 class PopupAliquota(QDialog):
     def __init__(self, empresa_id, parent=None):
@@ -79,14 +78,20 @@ class PopupAliquota(QDialog):
 
         self.carregar_dados()
 
-
     def carregar_dados(self):
         conexao = conectar_banco()
         cursor = conexao.cursor()
 
         cursor.execute("""
-            SELECT id, codigo, produto, ncm, aliquota FROM cadastro_tributacao
-            WHERE empresa_id = %s AND (aliquota IS NULL OR aliquota = '')
+            SELECT 
+            MIN(id) as id,
+            MIN(codigo) as codigo,
+            produto,
+            ncm,
+            NULL as aliquota
+        FROM cadastro_tributacao
+        WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
+        GROUP BY produto, ncm
         """, (self.empresa_id,))
 
         dados = cursor.fetchall()
@@ -100,7 +105,7 @@ class PopupAliquota(QDialog):
 
         for row_idx, (id_, codigo, produto, ncm, aliquota) in enumerate(dados):
             self.tabela.setItem(row_idx, 0, QTableWidgetItem(str(id_)))
-            self.tabela.setItem(row_idx, 1, QTableWidgetItem(codigo))
+            self.tabela.setItem(row_idx, 1, QTableWidgetItem(str(codigo)))
             self.tabela.setItem(row_idx, 2, QTableWidgetItem(produto))
             self.tabela.setItem(row_idx, 3, QTableWidgetItem(ncm))
             item_aliquota = QTableWidgetItem(aliquota if aliquota else "")
@@ -114,22 +119,27 @@ class PopupAliquota(QDialog):
 
         try:
             for row in range(self.tabela.rowCount()):
-                id_item = int(self.tabela.item(row, 0).text())
+                produto = self.tabela.item(row, 2).text().strip()
+                ncm = self.tabela.item(row, 3).text().strip()
                 nova_aliquota = self.tabela.item(row, 4).text().strip()
+
+                print(f"[DEBUG] Atualizando produto='{produto}', NCM='{ncm}', nova_aliquota='{nova_aliquota}'")
+
                 cursor.execute("""
                     UPDATE cadastro_tributacao
                     SET aliquota = %s
-                    WHERE id = %s AND empresa_id = %s
-                """, (nova_aliquota, id_item, self.empresa_id))
+                    WHERE produto = %s AND ncm = %s AND empresa_id = %s
+                """, (nova_aliquota, produto, ncm, self.empresa_id))
 
             conexao.commit()
+            print("[DEBUG] Commit realizado.")
             self.label.setText("Alíquotas atualizadas com sucesso.")
-            atualizar_aliquotas_e_resultado(self.empresa_id)
             self.accept()
 
         except Exception as e:
             conexao.rollback()
             self.label.setText(f"Erro ao salvar: {e}")
+            print(f"[ERRO] {e}")
         finally:
             cursor.close()
             fechar_banco(conexao)
