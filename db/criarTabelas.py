@@ -15,7 +15,7 @@ def criar_indice_se_nao_existir(cursor, nome_tabela, nome_indice, colunas, uniqu
         tipo = "UNIQUE INDEX" if unique else "INDEX"
         print(f"[INFO] Criando {tipo} '{nome_indice}' em '{nome_tabela}'...")
         cursor.execute(f"""
-            ALTER TABLE {nome_tabela}
+            ALTER TABLE `{nome_tabela}`
             ADD {tipo} {nome_indice} ({colunas})
         """)
     else:
