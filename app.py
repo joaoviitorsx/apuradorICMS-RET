@@ -26,7 +26,6 @@ def sinal_encerramento(sig, frame):
     QCoreApplication.quit()
 
 signal.signal(signal.SIGINT, sinal_encerramento)
-signal.signal(signal.SIGTERM, sinal_encerramento)
 
 if __name__ == '__main__':
     main()
