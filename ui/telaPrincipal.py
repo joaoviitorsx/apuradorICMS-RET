@@ -141,6 +141,20 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         conexao = conectar_banco()
+
+        cursor = conexao.cursor()
+        periodo = f"{mes.zfill(2)}/{ano}"
+        cursor.execute("""
+            SELECT COUNT(*) FROM c170_clone
+            WHERE empresa_id = %s AND periodo = %s
+        """, (self.empresa_id, periodo))
+        total = cursor.fetchone()[0]
+
+        if total == 0:
+            mensagem_aviso(f"Não há registros para o período {mes}/{ano}.")
+            fechar_banco(conexao)
+            return
+
         if not conexao:
             mensagem_error("Não foi possível conectar ao banco de dados.")
             return
