@@ -37,7 +37,6 @@ def mapear_colunas(df):
     return None
 
 def enviar_tributacao(empresa_id, progress_bar):
-    from PySide6.QtWidgets import QFileDialog
     conexao = conectar_banco()
     progress_bar.setValue(0)
 
@@ -72,8 +71,15 @@ def enviar_tributacao(empresa_id, progress_bar):
 
         cursor = conexao.cursor()
 
-        cursor.execute("SELECT codigo FROM cadastro_tributacao WHERE empresa_id = %s", (empresa_id,))
-        codigos_existentes = set(row[0] for row in cursor.fetchall())
+        # Busca registros existentes com os 4 campos: chave composta
+        cursor.execute("""
+            SELECT codigo, produto, ncm, aliquota FROM cadastro_tributacao
+            WHERE empresa_id = %s
+        """, (empresa_id,))
+        registros_existentes = {
+            (str(c).strip(), str(p).strip(), str(n).strip()): str(a).strip()
+            for c, p, n, a in cursor.fetchall()
+        }
 
         novos_registros = []
         atualizacoes = []
@@ -83,14 +89,14 @@ def enviar_tributacao(empresa_id, progress_bar):
             produto = str(linha[mapeamento['PRODUTO']]).strip()
             ncm = str(linha[mapeamento['NCM']]).strip()
             aliquota = str(linha[mapeamento['ALIQUOTA']]).strip()
-            empresa = empresa_id
 
-            dados = (empresa, codigo, produto, ncm, aliquota)
+            chave = (codigo, produto, ncm)
+            aliquota_existente = registros_existentes.get(chave)
 
-            if codigo not in codigos_existentes:
-                novos_registros.append(dados)
-            else:
-                atualizacoes.append(dados)
+            if chave not in registros_existentes:
+                novos_registros.append((empresa_id, codigo, produto, ncm, aliquota))
+            elif aliquota_existente != aliquota:
+                atualizacoes.append((aliquota, empresa_id, codigo, produto, ncm))
 
         if novos_registros:
             cursor.executemany("""
@@ -102,11 +108,12 @@ def enviar_tributacao(empresa_id, progress_bar):
         if atualizacoes:
             cursor.executemany("""
                 UPDATE cadastro_tributacao
-                SET produto = %s, ncm = %s, aliquota = %s
-                WHERE codigo = %s AND empresa_id = %s
-            """, [(p, n, a, c, e) for (e, c, p, n, a) in atualizacoes])
+                SET aliquota = %s
+                WHERE empresa_id = %s AND codigo = %s AND produto = %s AND ncm = %s
+            """, atualizacoes)
             print(f"[DEBUG] {len(atualizacoes)} registros atualizados.")
 
+        # Atualização de aliquota_antiga (segura, mantendo compatibilidade)
         cursor.execute("""
             UPDATE cadastro_tributacao 
             SET aliquota_antiga = CASE
