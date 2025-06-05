@@ -120,7 +120,23 @@ def validar_cnpj(cnpj: str) -> bool:
     return (calc_digito(cnpj, peso1) == cnpj[12] and
             calc_digito(cnpj, peso2) == cnpj[13])
 
-
 def formatar_cnpj(cnpj: str) -> str:
     cnpj = ''.join(filter(str.isdigit, cnpj))
     return f"{cnpj[:2]}.{cnpj[2:5]}.{cnpj[5:8]}/{cnpj[8:12]}-{cnpj[12:]}"
+
+async def consultar_cnpj_api_async(cnpj: str) -> dict:
+    cnpj = re.sub(r'\D', '', cnpj)
+    if len(cnpj) != 14:
+        raise ValueError("CNPJ inválido.")
+
+    url = f'https://minhareceita.org/{cnpj}'
+    timeout = aiohttp.ClientTimeout(total=15)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(url) as resposta:
+            if resposta.status == 200:
+                return await resposta.json()
+            raise ValueError(f"Erro {resposta.status} ao consultar CNPJ.")
+
+def consultar_cnpj_api(cnpj: str) -> dict:
+    return asyncio.run(consultar_cnpj_api_async(cnpj))
