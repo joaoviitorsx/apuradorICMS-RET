@@ -45,7 +45,7 @@ class ExportWorker(QThread):
                     c.id, c.empresa_id, c.id_c100, c.ind_oper, c.filial, c.periodo, c.reg, c.cod_part,
                     IFNULL(f.nome, '') AS nome, IFNULL(f.cnpj, '') AS cnpj,
                     c.num_doc, c.cod_item, c.chv_nfe, c.num_item, c.descr_compl, c.ncm, c.unid,
-                    c.qtd, c.vl_desc, c.cfop, c.cst, c.aliquota, c.resultado
+                    c.qtd, c.vl_item, c.vl_desc, c.cfop, c.cst, c.aliquota, c.resultado
                 FROM c170_clone c
                 LEFT JOIN `0150` f 
                 ON f.cod_part = c.cod_part 
@@ -61,7 +61,7 @@ class ExportWorker(QThread):
             colunas = [
                 'id', 'empresa_id', 'id_c100', 'ind_oper', 'filial', 'periodo', 'reg', 'cod_part',
                 'nome', 'cnpj', 'num_doc', 'cod_item', 'chv_nfe', 'num_item', 'desc_compl', 'ncm', 'unid',
-                'qtd', 'vl_desc', 'cfop', 'cst', 'aliquota', 'resultado'
+                'qtd', 'vl_item','vl_desc', 'cfop', 'cst', 'aliquota', 'resultado'
             ]
 
             cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (self.empresa_id,))
@@ -89,7 +89,7 @@ class ExportWorker(QThread):
             worksheet.write('A2', periodo_legivel)
 
             colunas_desejadas = colunas 
-            colunas_numericas = {'qtd', 'vl_desc', 'aliquota', 'resultado'}
+            colunas_numericas = {'qtd', 'vl_item','vl_desc', 'aliquota', 'resultado'}
 
             for col_idx, col_name in enumerate(colunas_desejadas):
                 worksheet.write(2, col_idx, col_name)
