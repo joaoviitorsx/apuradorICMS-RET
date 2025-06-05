@@ -53,6 +53,13 @@ class EmpresaWindow(QtWidgets.QWidget):
         self.layout.setContentsMargins(20, 20, 20, 20)
         self.layout.setSpacing(10)
 
+        self.logo_label = QtWidgets.QLabel()
+        pixmap = QtGui.QPixmap("images/logo.png").scaled(300, 300, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+        self.logo_label.setPixmap(pixmap)
+        self.logo_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.layout.addWidget(self.logo_label, alignment=QtCore.Qt.AlignCenter)
+        self.layout.addSpacing(5)
+
         self.label_titulo = QtWidgets.QLabel('Escolha ou cadastre uma empresa')
         self.label_titulo.setStyleSheet("font-size: 20px; font-weight: bold; color: #ffffff;")
         self.label_titulo.setAlignment(QtCore.Qt.AlignCenter)
