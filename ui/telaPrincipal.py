@@ -10,7 +10,6 @@ from services.spedService import sinal_popup
 from ui.popupAliquota import PopupAliquota
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa, empresa_id):
@@ -26,6 +25,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QtWidgets.QVBoxLayout(self.central_widget)
 
+        self._criar_botao_voltar()
         self._setup_empresa_header()
         self._criar_botoes()
 
@@ -53,7 +53,32 @@ class MainWindow(QtWidgets.QMainWindow):
         sinal_popup.abrir_popup_signal.connect(abrir_popup_aliquota)
 
         self._criar_seletor_mes_ano()
-        
+
+    def _criar_botao_voltar(self):
+        layout_topo = QtWidgets.QHBoxLayout()
+        btn_voltar = QtWidgets.QPushButton("Voltar")
+        btn_voltar.setFont(QtGui.QFont("Arial", 12))
+        btn_voltar.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        btn_voltar.setStyleSheet("""
+            QPushButton {
+                background-color: #001F3F;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 5px;
+                padding: 5px 10px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                color: #00bfff;
+            }
+        """)
+        btn_voltar.clicked.connect(self._voltarTelaInicial)
+
+        layout_topo.addWidget(btn_voltar, alignment=QtCore.Qt.AlignLeft)
+        layout_topo.addStretch()
+        self.layout.addLayout(layout_topo)
+
     def _setup_empresa_header(self):
         self.frame_db = QtWidgets.QGroupBox('Empresa')
         self.frame_layout = QtWidgets.QVBoxLayout(self.frame_db)
@@ -195,3 +220,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.progress_bar.setValue(0)
 
+    def _voltarTelaInicial(self):
+        from ui.telaEmpresa import EmpresaWindow
+        self.tela_empresa = EmpresaWindow()
+        self.tela_empresa.show()
+        self.close()
