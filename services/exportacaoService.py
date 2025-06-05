@@ -64,7 +64,6 @@ class ExportWorker(QThread):
                 'qtd', 'vl_desc', 'cfop', 'cst', 'aliquota', 'resultado'
             ]
 
-            # Nome da empresa
             cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (self.empresa_id,))
             nome_empresa_result = cursor.fetchone()
             nome_empresa = nome_empresa_result[0] if nome_empresa_result else "empresa"
@@ -112,6 +111,7 @@ class ExportWorker(QThread):
                     self.progress.emit(progresso)
 
             workbook.close()
+            
             tempo_total = time.time() - start_time
             print(f"[DEBUG] Exportação concluída em {tempo_total:.2f} segundos")
             self.progress.emit(100)
