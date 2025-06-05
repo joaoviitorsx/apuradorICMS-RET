@@ -5,7 +5,6 @@ from services.spedService.tributacao import criar_e_preencher_c170nova
 from services.spedService.atualizacoes import atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado
 from services.spedService.clonagem import clonar_tabela_c170nova
 from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota, preencherTributacao
-from services.spedService.relatorioPDF import exibir_prompt_pdf_e_gerar
 
 async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     print(f"[POS] Iniciando etapas de pós-processamento para empresa_id={empresa_id}...")
@@ -54,5 +53,3 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     progress_bar.setValue(100)
     print("[POS] Pós-processamento concluído.")
 
-    if janela_pai:
-        QTimer.singleShot(0, lambda: exibir_prompt_pdf_e_gerar(empresa_id, janela_pai))
