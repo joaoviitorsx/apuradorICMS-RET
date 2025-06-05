@@ -35,7 +35,6 @@ class WorkerCarregarEmpresas(QtCore.QThread):
         except Exception as e:
             self.erro.emit(str(e))
 
-
 class EmpresaWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
