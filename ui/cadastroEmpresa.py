@@ -2,7 +2,8 @@ import re
 from PySide6 import QtWidgets, QtCore, QtGui
 from utils.mensagem import mensagem_error, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectar_banco, fechar_banco, inicializar_banco
+from db.conexao import conectar_banco, fechar_banco
+from utils.cnpj import consultar_cnpj_api
 
 class EmpresaCadastro(QtWidgets.QWidget):
     def __init__(self, nome_banco):
@@ -24,14 +25,15 @@ class EmpresaCadastro(QtWidgets.QWidget):
         self.cnpj_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #000000;")
         self.cnpj_input = QtWidgets.QLineEdit()
         self.cnpj_input.setInputMask('99.999.999/9999-99')
-        self.cnpj_input.setPlaceholderText('Digite o CNPJ')
+        self.cnpj_input.setPlaceholderText('Digite o CNPJ e pressione TAB')
         self.cnpj_input.setStyleSheet("font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; color: #000000;")
+        self.cnpj_input.editingFinished.connect(self.buscar_dados_cnpj)
 
         self.razao_social_label = QtWidgets.QLabel('Razão Social:')
         self.razao_social_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #000000;")
         self.razao_social_input = QtWidgets.QLineEdit()
-        self.razao_social_input.setPlaceholderText('Digite a razão social')
-        self.razao_social_input.setStyleSheet("font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; color: #000000;")
+        self.razao_social_input.setReadOnly(True)  # agora é preenchido automaticamente
+        self.razao_social_input.setStyleSheet("font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; background-color: #f0f0f0; color: #000000;")
 
         self.btn_cadastrar_empresa = QtWidgets.QPushButton('Cadastrar')
         self.btn_cadastrar_empresa.setStyleSheet(self._botao_estilo())
@@ -77,14 +79,31 @@ class EmpresaCadastro(QtWidgets.QWidget):
             }
         """
 
+    def buscar_dados_cnpj(self):
+        cnpj_formatado = self.cnpj_input.text().strip()
+        cnpj = re.sub(r'\D', '', cnpj_formatado)
+
+        if len(cnpj) != 14:
+            mensagem_error("CNPJ inválido. Digite um CNPJ com 14 números.")
+            return
+
+        try:
+            dados = consultar_cnpj_api(cnpj)
+            razao = dados.get("razao_social") or dados.get("nome_fantasia")
+            if not razao:
+                raise ValueError("Razão social não encontrada.")
+            self.razao_social_input.setText(razao)
+        except Exception as e:
+            mensagem_error(f"Erro ao consultar CNPJ: {str(e)}")
+            self.razao_social_input.clear()
+
     def cadastrar_empresa(self):
         cnpj = self.cnpj_input.text().strip()
         razao_social = self.razao_social_input.text().strip()
-
         cnpj_numeros = re.sub(r'\D', '', cnpj)
 
-        if not razao_social or len(cnpj) != 18:
-            mensagem_error("Preencha todos os campos corretamente.")
+        if not razao_social or len(cnpj_numeros) != 14:
+            mensagem_error("CNPJ inválido ou razão social não preenchida.")
             return
 
         self.worker = CadastroEmpresaWorker(cnpj_numeros, razao_social)
@@ -133,5 +152,3 @@ class CadastroEmpresaWorker(QtCore.QThread):
             self.cadastro_finalizado.emit("Empresa cadastrada com sucesso.")
         except Exception as e:
             self.erro_ocorrido.emit(str(e))
-
-
