@@ -125,11 +125,12 @@ class PopupAliquota(QDialog):
 
                 print(f"[DEBUG] Atualizando produto='{produto}', NCM='{ncm}', nova_aliquota='{nova_aliquota}'")
 
-                cursor.execute("""
-                    UPDATE cadastro_tributacao
-                    SET aliquota = %s
-                    WHERE produto = %s AND ncm = %s AND empresa_id = %s
-                """, (nova_aliquota, produto, ncm, self.empresa_id))
+                if nova_aliquota:
+                    cursor.execute("""
+                        UPDATE cadastro_tributacao
+                        SET aliquota = %s
+                        WHERE produto = %s AND ncm = %s AND empresa_id = %s
+                    """, (nova_aliquota, produto, ncm, self.empresa_id))
 
             conexao.commit()
             print("[DEBUG] Commit realizado.")

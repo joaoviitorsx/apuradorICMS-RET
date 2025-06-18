@@ -40,7 +40,7 @@ async def criar_e_preencher_c170nova(empresa_id):
                 ON cc.id = c.id_c100
             JOIN cadastro_fornecedores f
                 ON cc.cod_part = f.cod_part
-                AND f.decreto = 'Não' AND f.uf = 'CE' AND f.empresa_id = %s
+                AND f.decreto = 'Não' AND f.empresa_id = %s
             LEFT JOIN `0200` o
                 ON c.cod_item = o.cod_item
                 AND o.empresa_id = c.empresa_id
@@ -49,7 +49,7 @@ async def criar_e_preencher_c170nova(empresa_id):
                 AND n.id_c100 = c.id_c100 
                 AND n.empresa_id = c.empresa_id
             WHERE c.empresa_id = %s
-            AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
+            AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116','2.102', '2.403', '2.101', '2.102', '2.401', '2.403', '2.910', '2.116')
             AND n.cod_item IS NULL
         """, (empresa_id, empresa_id))
 

@@ -207,6 +207,7 @@ def criar_tabelas_principais():
                 ncm VARCHAR(20),
                 aliquota VARCHAR(10),
                 aliquota_antiga VARCHAR(10),
+                aliquotaRET VARCHAR(10),
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -249,7 +250,9 @@ def criar_tabelas_principais():
                 num_doc VARCHAR(20),
                 chv_nfe VARCHAR(60),
                 aliquota VARCHAR(10),
+                aliquotaRET VARCHAR(10),
                 resultado VARCHAR(20),
+                resultadoRET VARCHAR(20),
                 INDEX idx_empresa (empresa_id)
             )
         """)

@@ -10,7 +10,8 @@ COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
     'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
     'NCM': ['ncm', 'cod_ncm', 'ncm_code'],
-    'ALIQUOTA': ['aliquota', 'alíquota', 'aliq', 'aliq_icms']
+    'ALIQUOTA': ['aliquota', 'alíquota', 'aliq', 'aliq_icms'],
+    'RET': ['ret', 'retencao', 'ret_icms', 'valor_ret', 'ret_icms_valor', 'rt']
 }
 
 def normalizar_texto(texto):
@@ -29,7 +30,7 @@ def mapear_colunas(df):
             if coluna_padrao in colunas_encontradas:
                 break
 
-    colunas_necessarias = ['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA']
+    colunas_necessarias = ['CODIGO', 'PRODUTO', 'NCM', 'ALIQUOTA', 'RET']
     if all(col in colunas_encontradas for col in colunas_necessarias):
         return colunas_encontradas
 
@@ -66,19 +67,21 @@ def enviar_tributacao(empresa_id, progress_bar):
         col_aliquota = mapeamento['ALIQUOTA']
         df[col_aliquota] = df[col_aliquota].fillna('').astype(str).str.strip().apply(formatar_aliquota)
 
-        df_inserir = df[[mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA']]].copy()
+        col_aliquotaRT = mapeamento['RET']
+        df[col_aliquotaRT] = df[col_aliquotaRT].fillna('').astype(str).str.strip().apply(formatar_aliquota)
+
+        df_inserir = df[[mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA'], mapeamento['RET']]].copy()
         df_inserir['empresa_id'] = empresa_id
 
         cursor = conexao.cursor()
 
-        # Busca registros existentes com os 4 campos: chave composta
         cursor.execute("""
-            SELECT codigo, produto, ncm, aliquota FROM cadastro_tributacao
+            SELECT codigo, produto, ncm, aliquota, aliquotaRET FROM cadastro_tributacao
             WHERE empresa_id = %s
         """, (empresa_id,))
         registros_existentes = {
-            (str(c).strip(), str(p).strip(), str(n).strip()): str(a).strip()
-            for c, p, n, a in cursor.fetchall()
+            (str(c).strip(), str(p).strip(), str(n).strip()): (str(a).strip(), str(r).strip())
+            for c, p, n, a, r in cursor.fetchall()
         }
 
         novos_registros = []
@@ -89,31 +92,31 @@ def enviar_tributacao(empresa_id, progress_bar):
             produto = str(linha[mapeamento['PRODUTO']]).strip()
             ncm = str(linha[mapeamento['NCM']]).strip()
             aliquota = str(linha[mapeamento['ALIQUOTA']]).strip()
+            aliquotaRET = str(linha[mapeamento['RET']]).strip()
 
             chave = (codigo, produto, ncm)
-            aliquota_existente = registros_existentes.get(chave)
+            aliquota_existente, aliquotaRET_existente = registros_existentes.get(chave, (None, None))
 
             if chave not in registros_existentes:
-                novos_registros.append((empresa_id, codigo, produto, ncm, aliquota))
-            elif aliquota_existente != aliquota:
-                atualizacoes.append((aliquota, empresa_id, codigo, produto, ncm))
+                novos_registros.append((empresa_id, codigo, produto, ncm, aliquota, aliquotaRET))
+            elif aliquota_existente != aliquota or aliquotaRET_existente != aliquotaRET:
+                atualizacoes.append((aliquota, aliquotaRET, empresa_id, codigo, produto, ncm))
 
         if novos_registros:
             cursor.executemany("""
-                INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, novos_registros)
             print(f"[DEBUG] {len(novos_registros)} novos registros inseridos.")
 
         if atualizacoes:
             cursor.executemany("""
                 UPDATE cadastro_tributacao
-                SET aliquota = %s
+                SET aliquota = %s, aliquotaRET = %s
                 WHERE empresa_id = %s AND codigo = %s AND produto = %s AND ncm = %s
             """, atualizacoes)
             print(f"[DEBUG] {len(atualizacoes)} registros atualizados.")
 
-        # Atualização de aliquota_antiga (segura, mantendo compatibilidade)
         cursor.execute("""
             UPDATE cadastro_tributacao 
             SET aliquota_antiga = CASE
@@ -153,22 +156,23 @@ def atualizar_aliquota_c170_clone(empresa_id, periodo=None):
             cursor.execute("""
                 UPDATE c170_clone c
                 JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = %s
-                SET c.aliquota = t.aliquota
-                WHERE t.aliquota IS NOT NULL 
-                  AND TRIM(t.aliquota) <> '' 
+                SET c.aliquota = t.aliquota, c.aliquotaRET = t.aliquotaRET
+                WHERE (t.aliquota IS NOT NULL OR t.aliquotaRET IS NOT NULL)
+                  AND (TRIM(t.aliquota) <> '' OR TRIM(t.aliquotaRET) <> '')
                   AND c.periodo = %s AND c.empresa_id = %s
             """, (empresa_id, periodo, empresa_id))
         else:
             cursor.execute("""
                 UPDATE c170_clone c
                 JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = %s
-                SET c.aliquota = t.aliquota
-                WHERE t.aliquota IS NOT NULL 
-                  AND TRIM(t.aliquota) <> '' AND c.empresa_id = %s
+                SET c.aliquota = t.aliquota, c.aliquotaRET = t.aliquotaRET
+                WHERE (t.aliquota IS NOT NULL OR t.aliquotaRET IS NOT NULL)
+                  AND (TRIM(t.aliquota) <> '' OR TRIM(t.aliquotaRET) <> '')
+                  AND c.empresa_id = %s
             """, (empresa_id, empresa_id))
 
         conexao.commit()
-        print("[EXPORTAÇÃO] Alíquotas atualizadas com sucesso.")
+        print("[EXPORTAÇÃO] Alíquotas e RET atualizados com sucesso.")
     except Exception as e:
         conexao.rollback()
         print(f"[ERRO] ao atualizar alíquotas: {e}")

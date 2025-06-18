@@ -22,7 +22,7 @@ async def comparar_adicionar_atualizar_fornecedores(empresa_id):
         """)
         columns = [row[0] for row in cursor.fetchall()]
         if not all(col in columns for col in ['cnae', 'decreto', 'uf', 'simples']):
-            print("⚠️ Colunas obrigatórias não encontradas.")
+            print("Colunas obrigatórias não encontradas.")
             return
 
         print("Buscando fornecedores a adicionar")

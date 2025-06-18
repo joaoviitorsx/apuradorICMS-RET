@@ -4,7 +4,7 @@ from mysql.connector import Error
 HOST = 'localhost'
 USUARIO = 'root'
 SENHA = '12345'
-BANCO = 'empresas_db'
+BANCO = 'empresasRT_db'
 
 def conectar_mysql():
     try:
