@@ -1,4 +1,4 @@
-# Apurador de ICMS
+# Apurador de ICMS + RET
 
 Um sistema desktop completo para **apuração do ICMS (Imposto sobre Circulação de Mercadorias e Serviços)**, desenvolvido especialmente para empresas do setor **varejista**. Esta aplicação automatiza o processamento de arquivos fiscais SPED, realiza o controle de alíquotas e gera relatórios com eficiência e precisão.
 
