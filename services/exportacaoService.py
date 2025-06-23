@@ -3,16 +3,13 @@ import time
 import xlsxwriter
 from decimal import Decimal
 from PySide6.QtCore import QThread, Signal
-from ui.popupAliquota import PopupAliquota
+from utils.aliquota import formatar_aliquota
 from db.conexao import conectar_banco, fechar_banco
-from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
-from services.spedService import sinal_popup
 
 class ExportWorker(QThread):
     progress = Signal(int)
     finished = Signal(str)
     erro = Signal(str)
-    popup_aliquota = Signal()
 
     def __init__(self, empresa_id, mes, ano, caminho_arquivo):
         super().__init__()
@@ -37,9 +34,8 @@ class ExportWorker(QThread):
                 FROM cadastro_tributacao 
                 WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
             """, (self.empresa_id,))
-            produtos_nulos = cursor.fetchall()
-            if produtos_nulos:
-                self.erro.emit("Existem produtos com alíquotas nulas. Importe os SPEDs Novamente e preencha as alíquotas.")
+            if cursor.fetchall():
+                self.erro.emit("Existem produtos com alíquotas nulas. Verifique o preenchimento antes de exportar.")
                 return
 
             cursor.execute("""
@@ -47,30 +43,35 @@ class ExportWorker(QThread):
                     c.id, c.empresa_id, c.id_c100, c.ind_oper, c.filial, c.periodo, c.reg, c.cod_part,
                     IFNULL(f.nome, '') AS nome, IFNULL(f.cnpj, '') AS cnpj,
                     c.num_doc, c.cod_item, c.chv_nfe, c.num_item, c.descr_compl, c.ncm, c.unid,
-                    c.qtd, c.vl_item, c.vl_desc, c.cfop, c.cst, c.aliquota, c.resultado
+                    c.qtd, c.vl_item, c.vl_desc, c.cfop, c.cst, c.aliquota, c.resultado,
+                    c.aliquotaRET, '' AS resultadoRET,
+                    c.ufOrigem, c.ufDestino
                 FROM c170_clone c
                 LEFT JOIN `0150` f 
-                ON f.cod_part = c.cod_part 
-                AND f.empresa_id = c.empresa_id 
-                AND f.periodo = c.periodo
+                    ON f.cod_part = c.cod_part AND f.empresa_id = c.empresa_id AND f.periodo = c.periodo
                 WHERE c.periodo = %s AND c.empresa_id = %s
             """, (periodo, self.empresa_id))
             dados = cursor.fetchall()
             if not dados:
-                self.erro.emit("Não existem dados para o mês e ano selecionados.")
+                self.erro.emit("Não existem dados para o período selecionado.")
                 return
 
             colunas = [
                 'id', 'empresa_id', 'id_c100', 'ind_oper', 'filial', 'periodo', 'reg', 'cod_part',
-                'nome', 'cnpj', 'num_doc', 'cod_item', 'chv_nfe', 'num_item', 'desc_compl', 'ncm', 'unid',
-                'qtd', 'vl_item','vl_desc', 'cfop', 'cst', 'aliquota', 'resultado'
+                'nome', 'cnpj', 'num_doc', 'cod_item', 'chv_nfe', 'num_item', 'descr_compl', 'ncm', 'unid',
+                'qtd', 'vl_item', 'vl_desc', 'cfop', 'cst', 'aliquota', 'resultado',
+                'aliquotaRET', 'resultadoRET', 'ufOrigem', 'ufDestino'
             ]
 
             cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (self.empresa_id,))
-            nome_empresa_result = cursor.fetchone()
-            nome_empresa = nome_empresa_result[0] if nome_empresa_result else "empresa"
+            nome_empresa = cursor.fetchone()
+            nome_empresa = nome_empresa[0] if nome_empresa else "empresa"
 
-            cursor.execute("SELECT periodo, dt_ini, dt_fin FROM `0000` WHERE empresa_id = %s AND periodo = %s LIMIT 1", (self.empresa_id, periodo))
+            cursor.execute("""
+                SELECT periodo, dt_ini, dt_fin 
+                FROM `0000` 
+                WHERE empresa_id = %s AND periodo = %s LIMIT 1
+            """, (self.empresa_id, periodo))
             resultado = cursor.fetchone()
             if not resultado:
                 self.erro.emit("Período não encontrado na tabela 0000.")
@@ -90,22 +91,40 @@ class ExportWorker(QThread):
             worksheet.write('A1', nome_empresa)
             worksheet.write('A2', periodo_legivel)
 
-            colunas_desejadas = colunas 
-            colunas_numericas = {'qtd', 'vl_item','vl_desc', 'aliquota', 'resultado'}
+            colunas_numericas = {'qtd', 'vl_item', 'vl_desc', 'resultado', 'resultadoRET'}
 
-            for col_idx, col_name in enumerate(colunas_desejadas):
+            for col_idx, col_name in enumerate(colunas):
                 worksheet.write(2, col_idx, col_name)
 
             for row_idx, row in enumerate(dados, start=3):
                 dados_dict = dict(zip(colunas, row))
-                for col_idx, nome_coluna in enumerate(colunas_desejadas):
+
+                try:
+                    vl_item = Decimal(str(dados_dict.get('vl_item') or 0).replace(',', '.'))
+                    vl_desc = Decimal(str(dados_dict.get('vl_desc') or 0).replace(',', '.'))
+                    aliquota_ret = Decimal(str(dados_dict.get('aliquotaRET') or 0).replace('%', '').replace(',', '.'))
+
+                    base_calculo = max(vl_item - vl_desc, 0)
+                    resultado_ret = base_calculo * (aliquota_ret / 100)
+                    dados_dict['resultadoRET'] = resultado_ret
+
+                except Exception as e:
+                    print(f"[ERRO] Falha no cálculo de resultadoRET na linha {row_idx}: {e}")
+                    dados_dict['resultadoRET'] = 0
+
+                for col_idx, nome_coluna in enumerate(colunas):
                     valor = dados_dict.get(nome_coluna, '')
-                    if nome_coluna in colunas_numericas:
+
+                    if nome_coluna in {'aliquota', 'aliquotaRET'}:
+                        valor = formatar_aliquota(valor)
+
+                    elif nome_coluna in colunas_numericas:
                         try:
                             valor = float(valor)
                             valor = f"{valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
                         except:
-                            pass
+                            valor = '0,00'
+
                     worksheet.write_string(row_idx, col_idx, str(valor))
 
                 if row_idx % 10000 == 0:
@@ -113,9 +132,8 @@ class ExportWorker(QThread):
                     self.progress.emit(progresso)
 
             workbook.close()
-            
             tempo_total = time.time() - start_time
-            print(f"[DEBUG] Exportação concluída em {tempo_total:.2f} segundos")
+            print(f"[INFO] Exportação concluída em {tempo_total:.2f} segundos")
             self.progress.emit(100)
             self.finished.emit(self.caminho_arquivo)
 
