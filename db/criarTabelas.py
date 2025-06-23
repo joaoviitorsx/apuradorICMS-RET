@@ -208,6 +208,7 @@ def criar_tabelas_principais():
                 aliquota VARCHAR(10),
                 aliquota_antiga VARCHAR(10),
                 aliquotaRET VARCHAR(10),
+                categoria_fiscal VARCHAR(50),
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -249,6 +250,7 @@ def criar_tabelas_principais():
                 cod_part VARCHAR(60),
                 num_doc VARCHAR(20),
                 chv_nfe VARCHAR(60),
+                uf VARCHAR(3),
                 aliquota VARCHAR(10),
                 aliquotaRET VARCHAR(10),
                 resultado VARCHAR(20),
@@ -264,6 +266,7 @@ def criar_tabelas_principais():
                 cod_item VARCHAR(60),
                 periodo VARCHAR(10),
                 reg VARCHAR(10),
+                uf VARCHAR(3),
                 num_item VARCHAR(10),
                 descr_compl VARCHAR(255),
                 cod_ncm VARCHAR(40),
@@ -281,6 +284,18 @@ def criar_tabelas_principais():
                 chv_nfe VARCHAR(60),
                 INDEX idx_empresa (empresa_id)
             )
+        """)
+
+        cursor.execute("""
+                CREATE TABLE cadastroAliquotaTermo (
+                codigo INT PRIMARY KEY,
+                uf VARCHAR(50),
+                regiao VARCHAR(50),
+                regra_geral FLOAT,
+                cesta_basica_7 FLOAT,
+                cesta_basica_12 FLOAT,
+                bebida_alcoolica FLOAT
+            );
         """)
 
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_cod_item_empresa', 'cod_item, empresa_id')
@@ -306,7 +321,38 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_produto_ncm_empresa', 'descr_compl, ncm, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_empresa_produto_ncm_aliquota', 'empresa_id, descr_compl, ncm, aliquota')
         criar_indice_se_nao_existir(cursor,'cadastro_tributacao','uniq_empresa_codigo_produto_ncm','empresa_id, codigo, produto(255), ncm',unique=True)
-            
+        
+        cursor.execute("""
+            INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
+            (12, 'RO', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (27, 'AC', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (16, 'AP', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (13, 'AM', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (29, 'BA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (23, 'CE', 'interno', 4.08, 2.19, 2.99, 4.78),
+            (53, 'DF', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+            (32, 'ES', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+            (52, 'GO', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+            (21, 'MA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (51, 'MT', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+            (50, 'MS', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+            (31, 'MG', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+            (15, 'PA', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (25, 'PB', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (41, 'PR', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+            (26, 'PE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (22, 'PI', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (24, 'RN', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (43, 'RS', 'sul', 10.96, 5.12, 6.58, 24.68),
+            (33, 'RJ', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+            (11, 'RO', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (14, 'RR', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (42, 'SC', 'sul', 10.96, 5.12, 6.58, 24.68),
+            (35, 'SP', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+            (28, 'SE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (17, 'TO', 'norte', 8.31, 4.16, 5.12, 19.84);
+            """)
+        
         conexao.commit()
         print("[DB] Todas as tabelas criadas ou atualizadas com sucesso.")
 
