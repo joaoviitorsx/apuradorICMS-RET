@@ -2,7 +2,7 @@ from PySide6.QtCore import QTimer
 from db.conexao import conectar_banco, fechar_banco
 from services.fornecedorService import comparar_adicionar_atualizar_fornecedores
 from services.spedService.tributacao import criar_e_preencher_c170nova
-from services.spedService.atualizacoes import atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado
+from services.spedService.atualizacoes import atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado, atualizar_aliquotaRET, calcular_aliquota_ret
 from services.spedService.clonagem import clonar_tabela_c170nova
 from services.spedService.verificacoes import verificar_e_abrir_popup_aliquota, preencherTributacao
 
@@ -32,6 +32,9 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     await atualizar_aliquota(empresa_id)
     print("[POS] Alíquotas atualizadas na tabela c170_clone.")
 
+    await atualizar_aliquotaRET(empresa_id)
+    print("[POS] Alíquotas RET atualizadas na tabela c170_clone.")
+
     conexao = conectar_banco()
     cursor = conexao.cursor()
     cursor.execute("SELECT dt_ini FROM `0000` WHERE empresa_id = %s ORDER BY id DESC LIMIT 1", (empresa_id,))
@@ -49,6 +52,8 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     progress_bar.setValue(90)
     await atualizar_resultado(empresa_id)
     print("[POS] Campo resultado calculado com base em vl_item e aliquota.")
+
+    await atualizar_aliquotaRET(empresa_id, periodo)
 
     progress_bar.setValue(100)
     print("[POS] Pós-processamento concluído.")
