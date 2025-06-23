@@ -18,12 +18,17 @@ async def clonar_tabela_c170nova(empresa_id):
             INSERT IGNORE INTO c170_clone (
                 id, empresa_id, cod_item, periodo, reg, num_item, descr_compl, ncm, qtd, unid,
                 vl_item, vl_desc, cst, cfop, id_c100, filial,
-                ind_oper, cod_part, num_doc, chv_nfe, aliquota, resultado
+                ind_oper, cod_part, num_doc, chv_nfe, 
+                uf, 
+                aliquota, resultado
             )
             SELECT 
                 c.id, c.empresa_id, c.cod_item, c.periodo, c.reg, c.num_item, c.descr_compl, c.cod_ncm, c.qtd, c.unid,
                 c.vl_item, c.vl_desc, c.cst, c.cfop, c.id_c100, c.filial,
-                c.ind_oper, c.cod_part, c.num_doc, c.chv_nfe, '' AS aliquota, '' AS resultado
+                c.ind_oper, c.cod_part, c.num_doc, c.chv_nfe, 
+                c.uf,       
+                '' AS aliquota,     
+                '' AS resultado     
             FROM c170nova c
             WHERE c.empresa_id = %s
         """, (empresa_id,))
