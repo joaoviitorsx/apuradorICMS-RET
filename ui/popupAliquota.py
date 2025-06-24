@@ -116,13 +116,12 @@ class PopupAliquota(QDialog):
             self.tabela.setItem(row_idx, 4, item_aliquota)
 
     def salvar_dados(self):
-        print("[SALVAR] Iniciando atualização de alíquotas...")
+        print("[SALVAR] Iniciando atualização de alíquotas")
         conexao = conectar_banco()
         cursor = conexao.cursor()
 
         try:
             for row in range(self.tabela.rowCount()):
-                # Captura os valores da tabela
                 produto = self.tabela.item(row, 2).text().strip() if self.tabela.item(row, 2) else ''
                 ncm = self.tabela.item(row, 3).text().strip() if self.tabela.item(row, 3) else ''
                 aliquota_bruta = self.tabela.item(row, 4).text().strip() if self.tabela.item(row, 4) else ''
@@ -135,46 +134,12 @@ class PopupAliquota(QDialog):
 
                 print(f"[DEBUG] Produto: {produto}, NCM: {ncm}, Alíquota informada: {aliquota_formatada}")
 
-                # Consultar UF e decreto do fornecedor
-                cursor.execute("""
-                    SELECT f.uf, f.decreto
-                    FROM cadastro_fornecedores f
-                    JOIN cadastro_tributacao t
-                    ON t.produto = %s AND t.ncm = %s AND t.empresa_id = f.empresa_id
-                    WHERE f.empresa_id = %s
-                    LIMIT 1
-                """, (produto, ncm, self.empresa_id))
-                dados_fornecedor = cursor.fetchone()
-
-                if not dados_fornecedor:
-                    uf_origem = 'CE'  # Default
-                    decreto = 'Não'
-                else:
-                    uf_origem, decreto = dados_fornecedor
-
-                uf_origem = str(uf_origem).upper().strip()
-
-                # Verificar se a alíquota é numérica
-                try:
-                    aliquota_num = float(aliquota_formatada.replace('%', '').replace(',', '.'))
-                    categoria = identificar_categoria(uf_origem, aliquota_num, decreto) or 'regra_geral'
-                    aliquota_ret = obter_aliquota(uf_origem, categoria, decreto)
-                    aliquota_ret_formatada = formatar_aliquota(aliquota_ret)
-
-                except Exception:
-                    print(f"[INFO] Produto {produto}, NCM {ncm} possui alíquota especial ({aliquota_formatada}). Skippando cálculo de RET.")
-                    categoria = ''
-                    aliquota_ret_formatada = ''
-
-                # Atualiza no banco de dados
                 cursor.execute("""
                     UPDATE cadastro_tributacao
-                    SET aliquota = %s, categoria_fiscal = %s, aliquotaRET = %s
+                    SET aliquota = %s, categoria_fiscal = '', aliquotaRET = ''
                     WHERE produto = %s AND ncm = %s AND empresa_id = %s
                 """, (
                     aliquota_formatada,
-                    categoria,
-                    aliquota_ret_formatada,
                     produto,
                     ncm,
                     self.empresa_id
@@ -182,7 +147,9 @@ class PopupAliquota(QDialog):
 
             conexao.commit()
             print("[SALVAR] Commit realizado com sucesso.")
+
             preencherAliquotaRET(self.empresa_id)
+
             self.label.setText("Alíquotas atualizadas com sucesso.")
             mensagem_sucesso("Dados salvos com sucesso!")
             self.accept()
