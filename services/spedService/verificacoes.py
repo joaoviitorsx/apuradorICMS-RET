@@ -69,19 +69,27 @@ async def preencherTributacao(empresa_id, parent=None):
                 SELECT 
                     c.empresa_id,
                     c.cod_item,
-                    p.descr_item AS produto,
+                    COALESCE(p.descr_item, c.descr_compl) AS produto,
                     p.cod_ncm AS ncm
                 FROM c170 c
-                JOIN c100 cc ON cc.id = c.id_c100
+                JOIN c100 cc 
+                    ON cc.id = c.id_c100
                 JOIN cadastro_fornecedores f 
                     ON cc.cod_part = f.cod_part
-                   AND f.decreto = 'Não'
-                   AND f.uf = 'CE'
-                   AND f.empresa_id = c.empresa_id
+                    AND f.empresa_id = c.empresa_id
                 LEFT JOIN `0200` p 
-                    ON c.cod_item = p.cod_item AND p.empresa_id = c.empresa_id
+                    ON c.cod_item = p.cod_item 
+                    AND p.empresa_id = c.empresa_id
                 WHERE c.empresa_id = %s
-                  AND c.cfop IN ('1101', '1401', '1102', '1403', '1910', '1116')
+                AND c.cfop IN (
+                        '1101', '1401', '1102', '1403', '1910', '1116',
+                        '2101', '2102', '2401', '2403', '2910', '2116'
+                )
+                AND (
+                        (f.uf = 'CE' AND f.decreto = 'Não')
+                        OR
+                        (f.uf <> 'CE')
+                )
             ) AS sub
             WHERE NOT EXISTS (
                 SELECT 1 FROM cadastro_tributacao ct
