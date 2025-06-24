@@ -4,6 +4,7 @@ import xlsxwriter
 from decimal import Decimal
 from PySide6.QtCore import QThread, Signal
 from utils.aliquota import formatar_aliquota
+from utils.conversao import Conversor
 from db.conexao import conectar_banco, fechar_banco
 
 class ExportWorker(QThread):
@@ -35,7 +36,7 @@ class ExportWorker(QThread):
                 WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
             """, (self.empresa_id,))
             if cursor.fetchall():
-                self.erro.emit("Existem produtos com alíquotas nulas. Verifique o preenchimento antes de exportar.")
+                self.erro.emit("Existem produtos com alíquotas nulas. Verifique antes de exportar.")
                 return
 
             cursor.execute("""
@@ -43,15 +44,16 @@ class ExportWorker(QThread):
                     c.id, c.empresa_id, c.id_c100, c.ind_oper, c.filial, c.periodo, c.reg, c.cod_part,
                     IFNULL(f.nome, '') AS nome, IFNULL(f.cnpj, '') AS cnpj,
                     c.num_doc, c.cod_item, c.chv_nfe, c.num_item, c.descr_compl, c.ncm, c.unid,
-                    c.qtd, c.vl_item, c.vl_desc, c.cfop, c.cst, c.aliquota, c.resultado,
-                    c.aliquotaRET, '' AS resultadoRET,
-                    c.ufOrigem, c.ufDestino
+                    c.qtd, c.vl_item, c.vl_desc, c.cfop, c.cst, c.uf, c.aliquota, c.resultado,
+                    c.aliquotaRET, c.resultadoRET
                 FROM c170_clone c
                 LEFT JOIN `0150` f 
                     ON f.cod_part = c.cod_part AND f.empresa_id = c.empresa_id AND f.periodo = c.periodo
                 WHERE c.periodo = %s AND c.empresa_id = %s
             """, (periodo, self.empresa_id))
+
             dados = cursor.fetchall()
+
             if not dados:
                 self.erro.emit("Não existem dados para o período selecionado.")
                 return
@@ -59,8 +61,8 @@ class ExportWorker(QThread):
             colunas = [
                 'id', 'empresa_id', 'id_c100', 'ind_oper', 'filial', 'periodo', 'reg', 'cod_part',
                 'nome', 'cnpj', 'num_doc', 'cod_item', 'chv_nfe', 'num_item', 'descr_compl', 'ncm', 'unid',
-                'qtd', 'vl_item', 'vl_desc', 'cfop', 'cst', 'aliquota', 'resultado',
-                'aliquotaRET', 'resultadoRET', 'ufOrigem', 'ufDestino'
+                'qtd', 'vl_item', 'vl_desc', 'cfop', 'cst', 'uf', 'aliquota', 'resultado',
+                'aliquotaRET', 'resultadoRET'
             ]
 
             cursor.execute("SELECT razao_social FROM empresas WHERE id = %s", (self.empresa_id,))
@@ -76,13 +78,14 @@ class ExportWorker(QThread):
             if not resultado:
                 self.erro.emit("Período não encontrado na tabela 0000.")
                 return
-            _, dt_ini, dt_fin = resultado
 
-            self.progress.emit(60)
+            _, dt_ini, dt_fin = resultado
 
             dt_ini_fmt = f"{dt_ini[:2]}/{dt_ini[2:4]}/{dt_ini[4:]}"
             dt_fin_fmt = f"{dt_fin[:2]}/{dt_fin[2:4]}/{dt_fin[4:]}"
             periodo_legivel = f"Período: {dt_ini_fmt} a {dt_fin_fmt}"
+
+            self.progress.emit(60)
 
             start_time = time.time()
             workbook = xlsxwriter.Workbook(self.caminho_arquivo)
@@ -98,19 +101,6 @@ class ExportWorker(QThread):
 
             for row_idx, row in enumerate(dados, start=3):
                 dados_dict = dict(zip(colunas, row))
-
-                try:
-                    vl_item = Decimal(str(dados_dict.get('vl_item') or 0).replace(',', '.'))
-                    vl_desc = Decimal(str(dados_dict.get('vl_desc') or 0).replace(',', '.'))
-                    aliquota_ret = Decimal(str(dados_dict.get('aliquotaRET') or 0).replace('%', '').replace(',', '.'))
-
-                    base_calculo = max(vl_item - vl_desc, 0)
-                    resultado_ret = base_calculo * (aliquota_ret / 100)
-                    dados_dict['resultadoRET'] = resultado_ret
-
-                except Exception as e:
-                    print(f"[ERRO] Falha no cálculo de resultadoRET na linha {row_idx}: {e}")
-                    dados_dict['resultadoRET'] = 0
 
                 for col_idx, nome_coluna in enumerate(colunas):
                     valor = dados_dict.get(nome_coluna, '')
