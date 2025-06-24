@@ -112,66 +112,55 @@ def preencherAliquotaRET(empresa_id, lote_tamanho=5000):
                 print(f"[AVISO] Dados incompletos para Produto: {produto}, NCM: {ncm}. Pulando...")
                 continue
 
-            aliquota_str = str(aliquota_bruta).strip().upper()
+            aliquota_str = str(aliquota_bruta).strip().upper().replace('%', '').replace(',', '.')
+            try:
+                aliquota_num = float(aliquota_str)
+            except:
+                print(f"[ERRO] Alíquota inválida para Produto: {produto}, NCM: {ncm}. Pulando...")
+                continue
 
-            if aliquota_str in ['ISENTO', 'ST', 'N/A', 'PAUTA']:
-                if aliquota_str in ['ISENTO', 'ST']:
-                    categoria = 'ST'
-                else:
-                    categoria = aliquota_str
-
-                aliquota_ret = aliquota_str
-
+            if aliquota_num in [17.00, 12.00, 4.00]:
+                categoria = 'regra_geral'
+            elif aliquota_num in [5.95, 4.20, 1.54]:
+                categoria = 'cesta_basica_7'
+            elif aliquota_num in [10.20, 7.20, 2.63]:
+                categoria = 'cesta_basica_12'
+            elif aliquota_num in [37.80, 30.39, 8.13]:
+                categoria = 'bebida_alcoolica'
             else:
-                try:
-                    aliquota_num = float(aliquota_str.replace('%', '').replace(',', '.'))
-                except ValueError:
-                    print(f"[ERRO] Alíquota inválida para Produto: {produto}, NCM: {ncm}. Pulando...")
-                    continue
+                categoria = 'regra_geral' 
 
-                cursor.execute("""
-                    SELECT COALESCE(f.uf, 'CE')
-                    FROM cadastro_fornecedores f
-                    JOIN cadastro_tributacao t
-                    ON t.produto = %s AND t.ncm = %s AND t.empresa_id = f.empresa_id
-                    WHERE t.empresa_id = %s
-                    LIMIT 1
-                """, (produto, ncm, empresa_id))
-                resultado_uf = cursor.fetchone()
+            cursor.execute("""
+                SELECT COALESCE(f.uf, 'CE')
+                FROM cadastro_fornecedores f
+                JOIN cadastro_tributacao t
+                  ON t.produto = %s AND t.ncm = %s AND t.empresa_id = f.empresa_id
+                WHERE t.empresa_id = %s
+                LIMIT 1
+            """, (produto, ncm, empresa_id))
+            resultado_uf = cursor.fetchone()
+            uf_origem = resultado_uf[0].strip().upper() if resultado_uf else 'CE'
 
-                uf_origem = resultado_uf[0].strip().upper() if resultado_uf else 'CE'
+            cursor.execute("""
+                SELECT regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica
+                FROM cadastroAliquotaTermo
+                WHERE uf = %s
+            """, (uf_origem,))
+            dados_uf = cursor.fetchone()
 
-                cursor.execute("""
-                    SELECT regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica
-                    FROM cadastroAliquotaTermo
-                    WHERE uf = %s
-                """, (uf_origem,))
-                dados_uf = cursor.fetchone()
+            if not dados_uf:
+                print(f"[ERRO] Nenhuma configuração de alíquotas encontrada para UF: {uf_origem}")
+                continue
 
-                if not dados_uf:
-                    print(f"[ERRO] Nenhuma configuração de alíquotas encontrada para UF: {uf_origem}")
-                    continue
+            mapeamento = {
+                'regra_geral': dados_uf[0],
+                'cesta_basica_7': dados_uf[1],
+                'cesta_basica_12': dados_uf[2],
+                'bebida_alcoolica': dados_uf[3]
+            }
 
-                regra_geral, cesta7, cesta12, bebida = dados_uf
-
-                mapeamento = {
-                    'regra_geral': regra_geral,
-                    'cesta_basica_7': cesta7,
-                    'cesta_basica_12': cesta12,
-                    'bebida_alcoolica': bebida
-                }
-
-                categoria = None
-                for nome, valor in mapeamento.items():
-                    if abs(float(valor) - aliquota_num) <= 0.01:
-                        categoria = nome
-                        break
-
-                if not categoria:
-                    categoria = 'regra_geral'
-
-                aliquota_ret_num = mapeamento.get(categoria, 0)
-                aliquota_ret = f"{aliquota_ret_num:.2f}%".replace('.', ',')
+            aliquota_ret_num = mapeamento.get(categoria, 0)
+            aliquota_ret = f"{aliquota_ret_num:.2f}%".replace('.', ',')
 
             atualizacoes.append((
                 categoria,
