@@ -2,7 +2,7 @@ import time
 from db.conexao import conectar_banco, fechar_banco
 
 async def criar_e_preencher_c170nova(empresa_id):
-    print(f"[INÍCIO] Preenchendo c170nova para empresa_id={empresa_id}...")
+    print(f"[INÍCIO] Preenchendo c170nova para empresa_id={empresa_id}")
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
