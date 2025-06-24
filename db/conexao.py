@@ -36,7 +36,6 @@ def conectar_banco():
 def fechar_banco(conexao):
     if conexao and conexao.is_connected():
         conexao.close()
-        print("[INFO] Conexão com banco encerrada.")
 
 def inicializar_banco():
     from db.criarTabelas import criar_tabelas_principais
