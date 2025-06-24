@@ -237,13 +237,13 @@ def criar_tabelas_principais():
                 num_item VARCHAR(10),
                 cod_item VARCHAR(60),
                 descr_compl VARCHAR(255),
-                qtd VARCHAR(20),
+                qtd DECIMAL(15,4),
                 unid VARCHAR(10),
-                vl_item VARCHAR(20),
-                vl_desc VARCHAR(20),
+                vl_item DECIMAL(15,2),
+                vl_desc DECIMAL(15,2),
                 cfop VARCHAR(10),
-                cst varchar(3),
-                ncm varchar(40),      
+                cst VARCHAR(3),
+                ncm VARCHAR(40),      
                 id_c100 INT,
                 filial VARCHAR(10),
                 ind_oper VARCHAR(5),
@@ -253,10 +253,10 @@ def criar_tabelas_principais():
                 uf VARCHAR(3),
                 aliquota VARCHAR(10),
                 aliquotaRET VARCHAR(10),
-                resultado VARCHAR(20),
-                resultadoRET VARCHAR(20),
+                resultado DECIMAL(15,2),
+                resultadoRET DECIMAL(15,2),
                 INDEX idx_empresa (empresa_id)
-            )
+            );
         """)
 
         cursor.execute("""
@@ -287,7 +287,7 @@ def criar_tabelas_principais():
         """)
 
         cursor.execute("""
-                CREATE TABLE cadastroAliquotaTermo (
+            CREATE TABLE IF NOT EXISTS cadastroAliquotaTermo (
                 codigo INT PRIMARY KEY,
                 uf VARCHAR(50),
                 regiao VARCHAR(50),
@@ -324,8 +324,8 @@ def criar_tabelas_principais():
         
         cursor.execute("""
             INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
-            (12, 'RO', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (27, 'AC', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+            (12, 'AC', 'norte', 8.31, 4.16, 5.12, 19.84),
+            (27, 'AL', 'nordeste', 8.31, 4.16, 5.12, 19.84),
             (16, 'AP', 'norte', 8.31, 4.16, 5.12, 19.84),
             (13, 'AM', 'norte', 8.31, 4.16, 5.12, 19.84),
             (29, 'BA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
