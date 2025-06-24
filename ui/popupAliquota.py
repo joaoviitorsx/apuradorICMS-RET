@@ -2,7 +2,10 @@ import pandas as pd
 from unidecode import unidecode
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QHBoxLayout, QMessageBox
 from PySide6.QtCore import Qt
+from utils.aliquota_uf import identificar_categoria, obter_aliquota, preencherAliquotaRET
+from utils.aliquota import formatar_aliquota, eh_aliquota_numerica
 from db.conexao import conectar_banco, fechar_banco
+from utils.mensagem import mensagem_sucesso, mensagem_error
 
 class PopupAliquota(QDialog):
     def __init__(self, empresa_id, parent=None):
@@ -113,34 +116,83 @@ class PopupAliquota(QDialog):
             self.tabela.setItem(row_idx, 4, item_aliquota)
 
     def salvar_dados(self):
-        print("Salvando no banco")
+        print("[SALVAR] Iniciando atualização de alíquotas...")
         conexao = conectar_banco()
         cursor = conexao.cursor()
 
         try:
             for row in range(self.tabela.rowCount()):
-                produto = self.tabela.item(row, 2).text().strip()
-                ncm = self.tabela.item(row, 3).text().strip()
-                nova_aliquota = self.tabela.item(row, 4).text().strip()
+                # Captura os valores da tabela
+                produto = self.tabela.item(row, 2).text().strip() if self.tabela.item(row, 2) else ''
+                ncm = self.tabela.item(row, 3).text().strip() if self.tabela.item(row, 3) else ''
+                aliquota_bruta = self.tabela.item(row, 4).text().strip() if self.tabela.item(row, 4) else ''
 
-                print(f"[DEBUG] Atualizando produto='{produto}', NCM='{ncm}', nova_aliquota='{nova_aliquota}'")
+                if not produto or not ncm or not aliquota_bruta:
+                    print(f"[AVISO] Linha {row} possui dados incompletos. Pulando...")
+                    continue
 
-                if nova_aliquota:
-                    cursor.execute("""
-                        UPDATE cadastro_tributacao
-                        SET aliquota = %s
-                        WHERE produto = %s AND ncm = %s AND empresa_id = %s
-                    """, (nova_aliquota, produto, ncm, self.empresa_id))
+                aliquota_formatada = formatar_aliquota(aliquota_bruta)
+
+                print(f"[DEBUG] Produto: {produto}, NCM: {ncm}, Alíquota informada: {aliquota_formatada}")
+
+                # Consultar UF e decreto do fornecedor
+                cursor.execute("""
+                    SELECT f.uf, f.decreto
+                    FROM cadastro_fornecedores f
+                    JOIN cadastro_tributacao t
+                    ON t.produto = %s AND t.ncm = %s AND t.empresa_id = f.empresa_id
+                    WHERE f.empresa_id = %s
+                    LIMIT 1
+                """, (produto, ncm, self.empresa_id))
+                dados_fornecedor = cursor.fetchone()
+
+                if not dados_fornecedor:
+                    uf_origem = 'CE'  # Default
+                    decreto = 'Não'
+                else:
+                    uf_origem, decreto = dados_fornecedor
+
+                uf_origem = str(uf_origem).upper().strip()
+
+                # Verificar se a alíquota é numérica
+                try:
+                    aliquota_num = float(aliquota_formatada.replace('%', '').replace(',', '.'))
+                    categoria = identificar_categoria(uf_origem, aliquota_num, decreto) or 'regra_geral'
+                    aliquota_ret = obter_aliquota(uf_origem, categoria, decreto)
+                    aliquota_ret_formatada = formatar_aliquota(aliquota_ret)
+
+                except Exception:
+                    print(f"[INFO] Produto {produto}, NCM {ncm} possui alíquota especial ({aliquota_formatada}). Skippando cálculo de RET.")
+                    categoria = ''
+                    aliquota_ret_formatada = ''
+
+                # Atualiza no banco de dados
+                cursor.execute("""
+                    UPDATE cadastro_tributacao
+                    SET aliquota = %s, categoria_fiscal = %s, aliquotaRET = %s
+                    WHERE produto = %s AND ncm = %s AND empresa_id = %s
+                """, (
+                    aliquota_formatada,
+                    categoria,
+                    aliquota_ret_formatada,
+                    produto,
+                    ncm,
+                    self.empresa_id
+                ))
 
             conexao.commit()
-            print("[DEBUG] Commit realizado.")
+            print("[SALVAR] Commit realizado com sucesso.")
+            preencherAliquotaRET(self.empresa_id)
             self.label.setText("Alíquotas atualizadas com sucesso.")
+            mensagem_sucesso("Dados salvos com sucesso!")
             self.accept()
 
         except Exception as e:
             conexao.rollback()
-            self.label.setText(f"Erro ao salvar: {e}")
             print(f"[ERRO] {e}")
+            mensagem_error(f"Erro ao salvar: {e}")
+            self.label.setText(f"Erro ao salvar: {e}")
+
         finally:
             cursor.close()
             fechar_banco(conexao)
@@ -287,3 +339,4 @@ class PopupAliquota(QDialog):
             import traceback
             print(f"Erro detalhado: {traceback.format_exc()}")
             QMessageBox.critical(self, "Erro ao importar", f"Ocorreu um erro ao importar a planilha:\n{str(e)}")
+
