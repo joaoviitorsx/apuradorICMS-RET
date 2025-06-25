@@ -74,9 +74,18 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
         btn_voltar.clicked.connect(self._voltarTelaInicial)
-
         layout_topo.addWidget(btn_voltar, alignment=QtCore.Qt.AlignLeft)
+
         layout_topo.addStretch()
+
+        btn_icone = QtWidgets.QPushButton()
+        btn_icone.setIcon(QtGui.QIcon("images/config.png"))
+        btn_icone.setIconSize(QtCore.QSize(32, 32))
+        btn_icone.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        btn_icone.setStyleSheet("background-color: transparent; border: none;")
+        btn_icone.clicked.connect(self._abrir_tela_produto)
+        layout_topo.addWidget(btn_icone, alignment=QtCore.Qt.AlignRight)
+
         self.layout.addLayout(layout_topo)
 
     def _setup_empresa_header(self):
@@ -225,3 +234,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tela_empresa = EmpresaWindow()
         self.tela_empresa.show()
         self.close()
+    
+    def _abrir_tela_produto(self):
+        from ui.telaProdutos import TelaProduto
+        self.tela_produto = TelaProduto(self.empresa_id)
+        self.tela_produto.show()
