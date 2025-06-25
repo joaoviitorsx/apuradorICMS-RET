@@ -298,6 +298,18 @@ def criar_tabelas_principais():
             );
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS decreto(
+                codigo INT PRIMARY KEY,
+                uf VARCHAR(50),
+                regiao VARCHAR(50),
+                regra_geral FLOAT,
+                cesta_basica_7 FLOAT,
+                cesta_basica_12 FLOAT,
+                bebida_alcoolica FLOAT
+            );
+        """)
+
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_cod_item_empresa', 'cod_item, empresa_id')
         criar_indice_se_nao_existir(cursor, 'cadastro_tributacao', 'idx_tributacao_codigo_empresa', 'codigo, empresa_id')
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_cod_item_empresa', 'cod_item, empresa_id')
@@ -323,36 +335,82 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor,'cadastro_tributacao','uniq_empresa_codigo_produto_ncm','empresa_id, codigo, produto(255), ncm',unique=True)
         
         cursor.execute("""
-            INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
-            (12, 'AC', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (27, 'AL', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (16, 'AP', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (13, 'AM', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (29, 'BA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (23, 'CE', 'interno', 4.08, 2.19, 2.99, 4.78),
-            (53, 'DF', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
-            (32, 'ES', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
-            (52, 'GO', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
-            (21, 'MA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (51, 'MT', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
-            (50, 'MS', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
-            (31, 'MG', 'sudeste', 10.96, 5.12, 6.58, 24.68),
-            (15, 'PA', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (25, 'PB', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (41, 'PR', 'sudeste', 10.96, 5.12, 6.58, 24.68),
-            (26, 'PE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (22, 'PI', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (24, 'RN', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (43, 'RS', 'sul', 10.96, 5.12, 6.58, 24.68),
-            (33, 'RJ', 'sudeste', 10.96, 5.12, 6.58, 24.68),
-            (11, 'RO', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (14, 'RR', 'norte', 8.31, 4.16, 5.12, 19.84),
-            (42, 'SC', 'sul', 10.96, 5.12, 6.58, 24.68),
-            (35, 'SP', 'sudeste', 10.96, 5.12, 6.58, 24.68),
-            (28, 'SE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
-            (17, 'TO', 'norte', 8.31, 4.16, 5.12, 19.84);
+                INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
+                (12, 'AC', 'norte', 8.31, 4.16, 5.12, 19.84),
+                (27, 'AL', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (16, 'AP', 'norte', 8.31, 4.16, 5.12, 19.84),
+                (13, 'AM', 'norte', 8.31, 4.16, 5.12, 19.84),
+                (29, 'BA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (23, 'CE', 'interno', 4.08, 2.19, 2.99, 4.78),
+                (53, 'DF', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+                (32, 'ES', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+                (52, 'GO', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+                (21, 'MA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (51, 'MT', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+                (50, 'MS', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+                (31, 'MG', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+                (15, 'PA', 'norte', 8.31, 4.16, 5.12, 19.84),
+                (25, 'PB', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (41, 'PR', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+                (26, 'PE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (22, 'PI', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (24, 'RN', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (43, 'RS', 'sul', 10.96, 5.12, 6.58, 24.68),
+                (33, 'RJ', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+                (11, 'RO', 'norte', 8.31, 4.16, 5.12, 19.84),
+                (14, 'RR', 'norte', 8.31, 4.16, 5.12, 19.84),
+                (42, 'SC', 'sul', 10.96, 5.12, 6.58, 24.68),
+                (35, 'SP', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+                (28, 'SE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+                (17, 'TO', 'norte', 8.31, 4.16, 5.12, 19.84)
+                ON DUPLICATE KEY UPDATE 
+                    uf = VALUES(uf),
+                    regiao = VALUES(regiao),
+                    regra_geral = VALUES(regra_geral),
+                    cesta_basica_7 = VALUES(cesta_basica_7),
+                    cesta_basica_12 = VALUES(cesta_basica_12),
+                    bebida_alcoolica = VALUES(bebida_alcoolica)
             """)
+
         
+        cursor.execute("""
+                INSERT INTO decreto (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
+                (12, 'AC', 'norte', 12.00, 4.20, 7.20, 30.39),
+                (27, 'AL', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (16, 'AP', 'norte', 12.00, 4.20, 7.20, 30.39),
+                (13, 'AM', 'norte', 12.00, 4.20, 7.20, 30.39),
+                (29, 'BA', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (23, 'CE', 'interno', 4.00, 1.54, 2.63, 8.13),
+                (53, 'DF', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+                (32, 'ES', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+                (52, 'GO', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+                (21, 'MA', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (51, 'MT', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+                (50, 'MS', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+                (31, 'MG', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+                (15, 'PA', 'norte', 12.00, 4.20, 7.20, 30.39),
+                (25, 'PB', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (41, 'PR', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+                (26, 'PE', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (22, 'PI', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (24, 'RN', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (43, 'RS', 'sul', 17.00, 5.95, 10.20, 37.80),
+                (33, 'RJ', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+                (11, 'RO', 'norte', 12.00, 4.20, 7.20, 30.39),
+                (14, 'RR', 'norte', 12.00, 4.20, 7.20, 30.39),
+                (42, 'SC', 'sul', 17.00, 5.95, 10.20, 37.80),
+                (35, 'SP', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+                (28, 'SE', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+                (17, 'TO', 'norte', 12.00, 4.20, 7.20, 30.39)
+                ON DUPLICATE KEY UPDATE
+                    uf = VALUES(uf),
+                    regiao = VALUES(regiao),
+                    regra_geral = VALUES(regra_geral),
+                    cesta_basica_7 = VALUES(cesta_basica_7),
+                    cesta_basica_12 = VALUES(cesta_basica_12),
+                    bebida_alcoolica = VALUES(bebida_alcoolica)
+            """)
+
         conexao.commit()
         print("[DB] Todas as tabelas criadas ou atualizadas com sucesso.")
 
