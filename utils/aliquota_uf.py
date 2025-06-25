@@ -107,60 +107,72 @@ def preencherAliquotaRET(empresa_id, lote_tamanho=5000):
 
         atualizacoes = []
 
-        for produto, ncm, aliquota_bruta in registros:
-            if not produto or not ncm or not aliquota_bruta:
-                print(f"[AVISO] Dados incompletos para Produto: {produto}, NCM: {ncm}. Pulando...")
+        for produto, ncm, aliquota in registros:
+            if not produto or not ncm or not aliquota:
+                print(f"[AVISO] Dados incompletos: Produto={produto}, NCM={ncm}")
                 continue
 
-            aliquota_str = str(aliquota_bruta).strip().upper().replace('%', '').replace(',', '.')
-            try:
-                aliquota_num = float(aliquota_str)
-            except:
-                print(f"[ERRO] Alíquota inválida para Produto: {produto}, NCM: {ncm}. Pulando...")
-                continue
+            aliquota_str = str(aliquota).strip().upper()
 
-            if aliquota_num in [17.00, 12.00, 4.00]:
-                categoria = 'regra_geral'
-            elif aliquota_num in [5.95, 4.20, 1.54]:
-                categoria = 'cesta_basica_7'
-            elif aliquota_num in [10.20, 7.20, 2.63]:
-                categoria = 'cesta_basica_12'
-            elif aliquota_num in [37.80, 30.39, 8.13]:
-                categoria = 'bebida_alcoolica'
+            if aliquota_str in ["ISENTO", "ST", "SUBSTITUICAO", "0", "0.00", "0,00"]:
+                categoria = 'ST'
             else:
-                categoria = 'regra_geral' 
+                try:
+                    aliquota_num = float(aliquota_str.replace('%', '').replace(',', '.'))
+                except:
+                    print(f"[ERRO] Alíquota inválida: {aliquota_str} | Produto={produto}, NCM={ncm}")
+                    continue
+
+                if aliquota_num in [17.00, 12.00, 4.00]:
+                    categoria = 'regraGeral'
+                elif aliquota_num in [5.95, 4.20, 1.54]:
+                    categoria = '7cestaBasica'
+                elif aliquota_num in [10.20, 7.20, 2.63]:
+                    categoria = '12cestaBasica'
+                elif aliquota_num in [37.80, 30.39, 8.13]:
+                    categoria = 'bebidaAlcoolica'
+                else:
+                    categoria = 'regraGeral'
 
             cursor.execute("""
-                SELECT COALESCE(f.uf, 'CE')
+                SELECT f.uf
                 FROM cadastro_fornecedores f
-                JOIN cadastro_tributacao t
-                  ON t.produto = %s AND t.ncm = %s AND t.empresa_id = f.empresa_id
-                WHERE t.empresa_id = %s
+                JOIN c170nova c ON c.cod_part = f.cod_part
+                WHERE c.descr_compl = %s AND c.empresa_id = %s
                 LIMIT 1
-            """, (produto, ncm, empresa_id))
+            """, (produto, empresa_id))
             resultado_uf = cursor.fetchone()
             uf_origem = resultado_uf[0].strip().upper() if resultado_uf else 'CE'
 
-            cursor.execute("""
-                SELECT regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica
-                FROM cadastroAliquotaTermo
-                WHERE uf = %s
-            """, (uf_origem,))
-            dados_uf = cursor.fetchone()
+            if categoria == 'ST':
+                aliquota_ret = '0,00%'
+            else:
+                colunas_validas = {
+                    'regraGeral': 'regra_geral',
+                    '7cestaBasica': 'cesta_basica_7',
+                    '12cestaBasica': 'cesta_basica_12',
+                    'bebidaAlcoolica': 'bebida_alcoolica'
+                }
+                coluna_aliquota = colunas_validas.get(categoria)
 
-            if not dados_uf:
-                print(f"[ERRO] Nenhuma configuração de alíquotas encontrada para UF: {uf_origem}")
-                continue
+                if not coluna_aliquota:
+                    print(f"[ERRO] Categoria inválida: {categoria}")
+                    continue
 
-            mapeamento = {
-                'regra_geral': dados_uf[0],
-                'cesta_basica_7': dados_uf[1],
-                'cesta_basica_12': dados_uf[2],
-                'bebida_alcoolica': dados_uf[3]
-            }
+                query = f"""
+                    SELECT {coluna_aliquota}
+                    FROM cadastroAliquotaTermo
+                    WHERE uf = %s
+                """
+                cursor.execute(query, (uf_origem,))
+                resultado = cursor.fetchone()
 
-            aliquota_ret_num = mapeamento.get(categoria, 0)
-            aliquota_ret = f"{aliquota_ret_num:.2f}%".replace('.', ',')
+                if not resultado:
+                    print(f"[ERRO] UF {uf_origem} não encontrada para categoria {categoria}.")
+                    continue
+
+                aliquota_ret_num = resultado[0]
+                aliquota_ret = f"{aliquota_ret_num:.2f}%".replace('.', ',')
 
             atualizacoes.append((
                 categoria,
@@ -187,15 +199,16 @@ def preencherAliquotaRET(empresa_id, lote_tamanho=5000):
                 WHERE produto = %s AND ncm = %s AND empresa_id = %s
             """, atualizacoes)
             conexao.commit()
-            print(f"[FINALIZADO] {len(atualizacoes)} registros atualizados no lote final.")
+            print(f"[FINALIZADO] {len(atualizacoes)} registros atualizados.")
         else:
             print("[INFO] Nenhuma atualização pendente.")
 
     except Exception as e:
         conexao.rollback()
-        print(f"[ERRO] Erro ao atualizar aliquotaRET e categoria: {e}")
+        print(f"[ERRO] Erro ao atualizar: {e}")
     finally:
         cursor.close()
         fechar_banco(conexao)
+
 
 
