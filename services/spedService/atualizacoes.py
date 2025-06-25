@@ -248,5 +248,95 @@ async def atualizar_resultadoRET(empresa_id):
         fechar_banco(conexao)
         print("[FIM] Finalização da atualização de resultadoRET.")
 
+async def corrigir_aliquota_decreto(empresa_id):
+    conexao = conectar_banco()
+    cursor = conexao.cursor()
+
+    print(f"[INÍCIO] Correção de alíquotas com base na tabela decreto para empresa_id={empresa_id}...")
+
+    try:
+        cursor.execute("""
+            SELECT c.cod_item, c.descr_compl, c.aliquota, f.uf, t.categoria_fiscal
+            FROM c170_clone c
+            JOIN cadastro_fornecedores f ON c.cod_part = f.cod_part
+            JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = c.empresa_id
+            WHERE c.empresa_id = %s AND f.uf <> 'CE' AND t.categoria_fiscal IS NOT NULL
+        """, (empresa_id,))
+        registros = cursor.fetchall()
+
+        atualizacoes = []
+
+        for cod_item, produto, aliquota_str, uf, categoria in registros:
+            if not aliquota_str:
+                continue
+
+            aliquota_normalizada = aliquota_str.strip().upper()
+
+            if aliquota_normalizada in ['ST', 'ISENTO', 'PAUTA']:
+                print(f"[RET ESPECIAL] Produto={produto} | UF={uf} | Alíquota={aliquota_normalizada}")
+                atualizacoes.append((
+                    aliquota_normalizada,
+                    empresa_id,
+                    cod_item
+                ))
+                continue
+
+            try:
+                aliquota_atual = float(aliquota_normalizada.replace('%', '').replace(',', '.'))
+            except:
+                print(f"[ERRO] Alíquota inválida para {produto}: {aliquota_str}")
+                continue
+
+            coluna_decreto = {
+                'regraGeral': 'regra_geral',
+                '7cestaBasica': 'cesta_basica_7',
+                '12cestaBasica': 'cesta_basica_12',
+                'bebidaAlcoolica': 'bebida_alcoolica'
+            }.get(categoria)
+
+            if not coluna_decreto:
+                print(f"[AVISO] Categoria fiscal não reconhecida: {categoria}")
+                continue
+
+            cursor.execute(f"""
+                SELECT {coluna_decreto}
+                FROM decreto
+                WHERE LOWER(uf) = LOWER(%s)
+            """, (uf,))
+            resultado = cursor.fetchone()
+
+            if not resultado:
+                print(f"[ERRO] UF {uf} não encontrada na tabela decreto.")
+                continue
+
+            aliquota_esperada = float(resultado[0])
+
+            if round(aliquota_atual, 2) != round(aliquota_esperada, 2):
+                print(f"[CORRIGINDO] Produto={produto} | UF={uf} | Cat={categoria} | Atual={aliquota_atual} | Esperado={aliquota_esperada}")
+                atualizacoes.append((
+                    f"{aliquota_esperada:.2f}%",
+                    empresa_id,
+                    cod_item
+                ))
+
+        if atualizacoes:
+            cursor.executemany("""
+                UPDATE c170_clone
+                SET aliquota = %s
+                WHERE empresa_id = %s AND cod_item = %s
+            """, atualizacoes)
+            conexao.commit()
+            print(f"[OK] {len(atualizacoes)} alíquotas atualizadas com sucesso.")
+        else:
+            print("[INFO] Nenhuma divergência encontrada.")
+
+    except Exception as e:
+        conexao.rollback()
+        print(f"[ERRO] Durante execução da função de correção: {e}")
+    finally:
+        cursor.close()
+        fechar_banco(conexao)
+
+
 
 
