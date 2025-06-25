@@ -1,7 +1,8 @@
 import pandas as pd
 from unidecode import unidecode
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QHBoxLayout, QMessageBox
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QHBoxLayout, QMessageBox, QApplication
 from PySide6.QtCore import Qt
+from PySide6 import QtGui
 from utils.aliquota_uf import identificar_categoria, obter_aliquota, preencherAliquotaRET
 from utils.aliquota import formatar_aliquota, eh_aliquota_numerica
 from db.conexao import conectar_banco, fechar_banco
@@ -15,69 +16,46 @@ class PopupAliquota(QDialog):
         self.setMinimumSize(800, 600)
         self.setup_ui()
 
+        screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos())
+        screen_geometry = screen.availableGeometry() if screen else QApplication.primaryScreen().availableGeometry()
+
+        center_point = screen_geometry.center()
+        self.move(center_point - self.rect().center())
+
     def setup_ui(self):
+        self.setStyleSheet("background-color: #030d18; color: white;")
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
 
         self.label = QLabel("Preencha as alíquotas nulas antes de prosseguir:")
+        self.label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label)
 
         self.tabela = QTableWidget()
+        self.tabela.setStyleSheet("background-color: #e1e1e1; color: black; border-radius: 10px;")
+        self.tabela.setAlternatingRowColors(True)
         layout.addWidget(self.tabela)
 
-        botoes_extra = QHBoxLayout()
-        
+        grupo_botoes = QHBoxLayout()
+
         self.botao_criar_planilha = QPushButton("Criar Planilha Modelo")
         self.botao_criar_planilha.clicked.connect(self.exportar_planilha_modelo)
-        self.botao_criar_planilha.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #0054b3;
-            }
-        """)
-        self.botao_criar_planilha.setCursor(Qt.PointingHandCursor)
-        botoes_extra.addWidget(self.botao_criar_planilha)
+        self._estilizar_botao(self.botao_criar_planilha, cor="#007bff", hover="#0054b3")
+        grupo_botoes.addWidget(self.botao_criar_planilha)
 
         self.botao_importar_planilha = QPushButton("Importar Planilha")
         self.botao_importar_planilha.clicked.connect(self.importar_planilha)
-        self.botao_importar_planilha.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #0054b3;
-            }
-        """)
-        self.botao_importar_planilha.setCursor(Qt.PointingHandCursor)
-        botoes_extra.addWidget(self.botao_importar_planilha)
+        self._estilizar_botao(self.botao_importar_planilha, cor="#007bff", hover="#0054b3")
+        grupo_botoes.addWidget(self.botao_importar_planilha)
 
-        layout.addLayout(botoes_extra)
+        layout.addLayout(grupo_botoes)
 
         self.botao_salvar = QPushButton("Salvar Tudo")
         self.botao_salvar.clicked.connect(self.salvar_dados)
-        self.botao_salvar.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #166628;
-            }
-        """)
-        self.botao_salvar.setCursor(Qt.PointingHandCursor)
-        layout.addWidget(self.botao_salvar)
+        self._estilizar_botao(self.botao_salvar, cor="#28a745", hover="#166628")
+        layout.addWidget(self.botao_salvar, alignment=Qt.AlignCenter)
 
         self.carregar_dados()
 
@@ -307,3 +285,18 @@ class PopupAliquota(QDialog):
             print(f"Erro detalhado: {traceback.format_exc()}")
             QMessageBox.critical(self, "Erro ao importar", f"Ocorreu um erro ao importar a planilha:\n{str(e)}")
 
+    def _estilizar_botao(self, botao, cor="#007bff", hover="#0054b3"):
+        botao.setCursor(Qt.PointingHandCursor)
+        botao.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {cor};
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 8px 16px;
+                border-radius: 5px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover};
+            }}
+        """)

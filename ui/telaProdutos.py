@@ -2,7 +2,6 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_aviso, mensagem_sucesso, mensagem_error
 
-
 class TelaProduto(QtWidgets.QWidget):
     def __init__(self, empresa_id):
         super().__init__()
@@ -17,6 +16,12 @@ class TelaProduto(QtWidgets.QWidget):
         self._criar_tabela()
         self._criar_botoes()
         self.carregar_dados()
+
+        screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos())
+        screen_geometry = screen.availableGeometry() if screen else QtWidgets.QApplication.primaryScreen().availableGeometry()
+
+        center_point = screen_geometry.center()
+        self.move(center_point - self.rect().center())
 
     def _criar_barra_pesquisa(self):
         search_layout = QtWidgets.QHBoxLayout()

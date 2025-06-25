@@ -1,7 +1,7 @@
 import os
 import asyncio
 from PySide6 import QtWidgets, QtGui, QtCore
-from PySide6.QtWidgets import QMessageBox, QDialog, QFileDialog
+from PySide6.QtWidgets import QMessageBox, QDialog, QFileDialog, QApplication
 from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
@@ -47,12 +47,19 @@ class MainWindow(QtWidgets.QMainWindow):
             popup = PopupAliquota(empresa_id, janela_pai)
             resultado = popup.exec()
             sinal_popup.resultado_popup = resultado
+            usar_icone(popup)
             if sinal_popup.event_loop and sinal_popup.event_loop.isRunning():
                 sinal_popup.event_loop.quit()
 
         sinal_popup.abrir_popup_signal.connect(abrir_popup_aliquota)
 
         self._criar_seletor_mes_ano()
+
+        screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos())
+        screen_geometry = screen.availableGeometry() if screen else QApplication.primaryScreen().availableGeometry()
+
+        center_point = screen_geometry.center()
+        self.move(center_point - self.rect().center())
 
     def _criar_botao_voltar(self):
         layout_topo = QtWidgets.QHBoxLayout()
@@ -233,9 +240,14 @@ class MainWindow(QtWidgets.QMainWindow):
         from ui.telaEmpresa import EmpresaWindow
         self.tela_empresa = EmpresaWindow()
         self.tela_empresa.show()
+        usar_icone(self.tela_empresa)
         self.close()
     
     def _abrir_tela_produto(self):
         from ui.telaProdutos import TelaProduto
         self.tela_produto = TelaProduto(self.empresa_id)
+        tela_produtos = TelaProduto(self.empresa_id)
+        tela_produtos.resize(self.size())
+        tela_produtos.move(self.pos())
+        usar_icone(self.tela_produto)
         self.tela_produto.show()

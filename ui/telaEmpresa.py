@@ -47,6 +47,12 @@ class EmpresaWindow(QtWidgets.QWidget):
         self._setup_layout()
         self._iniciar_verificacao_banco()
 
+        screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos())
+        screen_geometry = screen.availableGeometry() if screen else QtWidgets.QApplication.primaryScreen().availableGeometry()
+        center_point = screen_geometry.center()
+        self.move(center_point - self.rect().center())
+
+
     def _setup_layout(self):
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.setContentsMargins(20, 20, 20, 20)
@@ -155,16 +161,26 @@ class EmpresaWindow(QtWidgets.QWidget):
 
             empresa_id = resultado[0]
             self.janela_principal = MainWindow(nome_empresa, empresa_id)
+
+            self.janela_principal.resize(self.size())
+            self.janela_principal.move(self.pos())
+
+
             usar_icone(self.janela_principal)
-            self.janela_principal.showMaximized()
+            self.janela_principal.show()
             self.close()
+
         except Exception as e:
             mensagem_error(f"Erro ao abrir a empresa: {e}")
 
     def cadastrar_empresa(self, nome_banco):
         self.empresa_cadastro = EmpresaCadastro(nome_banco)
+
+        self.empresa_cadastro.resize(self.size())
+        self.empresa_cadastro.move(self.pos())
+
         usar_icone(self.empresa_cadastro)
-        self.empresa_cadastro.showMaximized()
+        self.empresa_cadastro.show()
         self.close()
 
     def exibir_erro_empresas(self, erro):

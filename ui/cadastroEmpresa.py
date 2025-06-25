@@ -65,6 +65,12 @@ class EmpresaCadastro(QtWidgets.QWidget):
 
         self.layout.addLayout(center_layout)
 
+        screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos())
+        screen_geometry = screen.availableGeometry() if screen else QtWidgets.QApplication.primaryScreen().availableGeometry()
+
+        center_point = screen_geometry.center()
+        self.move(center_point - self.rect().center())
+
     def _botao_estilo(self):
         return """
             QPushButton {
@@ -120,8 +126,12 @@ class EmpresaCadastro(QtWidgets.QWidget):
     def voltar(self):
         from ui.telaEmpresa import EmpresaWindow
         self.empresas = EmpresaWindow()
+
+        self.empresas.resize(self.size())
+        self.empresas.move(self.pos())
+
         usar_icone(self.empresas)
-        self.empresas.showMaximized()
+        self.empresas.show()
         self.close()
 
 

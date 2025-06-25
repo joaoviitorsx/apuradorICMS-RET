@@ -14,7 +14,7 @@ def main():
 
     janela = EmpresaWindow()
     usar_icone(janela)
-    janela.showMaximized()
+    janela.show()
 
     fim = time.time()
     print(f"[DEBUG] Tempo de abertura da janela inicial: {fim - inicio:.2f} segundos")

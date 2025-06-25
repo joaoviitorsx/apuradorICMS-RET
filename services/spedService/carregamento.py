@@ -38,7 +38,6 @@ def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, jan
             print("[DEBUG] Emitindo sinal de erro")
             mensageiro.sinal_erro.emit(mensagem_final)
 
-    progress_bar.setValue(0)
     loop.close()
 
 def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=None):
@@ -67,7 +66,6 @@ def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=N
     print(f"[DEBUG] Thread de processamento SPED iniciada")
 
 async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, janela=None):
-    progress_bar.setValue(0)
     print(f"[DEBUG] Iniciando processamento de {len(caminhos)} arquivo(s) SPED...")
 
     conexao_cheque = conectar_banco()
@@ -141,7 +139,5 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
             fechar_banco(conexao)
         except:
             pass
-        progress_bar.setValue(100)
         await asyncio.sleep(0.5)
-        progress_bar.setValue(0)
         label_arquivo.setText("Processamento finalizado.")
