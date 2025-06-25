@@ -63,7 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QPushButton {
                 background-color: #001F3F;
                 color: white;
-                font-size: 14px;
+                font-size: 18px;
                 font-weight: bold;
                 border-radius: 5px;
                 padding: 5px 10px;
