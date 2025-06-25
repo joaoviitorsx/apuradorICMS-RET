@@ -94,18 +94,39 @@ def enviar_tributacao(empresa_id, progress_bar):
             aliquota = str(linha[mapeamento['ALIQUOTA']]).strip()
             aliquotaRET = str(linha[mapeamento['RET']]).strip()
 
+            aliquota_str = aliquota.upper().replace('%', '').replace(',', '.').strip()
+
+            if aliquota_str in ["ISENTO", "ST", "SUBSTITUICAO", "0", "0.00"]:
+                categoria = 'ST'
+            else:
+                try:
+                    aliquota_num = float(aliquota_str)
+                    if aliquota_num in [17.00, 12.00, 4.00]:
+                        categoria = 'regraGeral'
+                    elif aliquota_num in [5.95, 4.20, 1.54]:
+                        categoria = '7cestaBasica'
+                    elif aliquota_num in [10.20, 7.20, 2.63]:
+                        categoria = '12cestaBasica'
+                    elif aliquota_num in [37.80, 30.39, 8.13]:
+                        categoria = 'bebidaAlcoolica'
+                    else:
+                        categoria = 'regraGeral'
+                except ValueError:
+                    print(f"[ERRO] Alíquota inválida na planilha: {aliquota_str} - Produto: {produto}")
+                    categoria = 'regraGeral'
+
             chave = (codigo, produto, ncm)
             aliquota_existente, aliquotaRET_existente = registros_existentes.get(chave, (None, None))
 
             if chave not in registros_existentes:
-                novos_registros.append((empresa_id, codigo, produto, ncm, aliquota, aliquotaRET))
+                novos_registros.append((empresa_id, codigo, produto, ncm, aliquota, aliquotaRET, categoria))
             elif aliquota_existente != aliquota or aliquotaRET_existente != aliquotaRET:
                 atualizacoes.append((aliquota, aliquotaRET, empresa_id, codigo, produto, ncm))
 
         if novos_registros:
             cursor.executemany("""
-                INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, novos_registros)
             print(f"[DEBUG] {len(novos_registros)} novos registros inseridos.")
 
