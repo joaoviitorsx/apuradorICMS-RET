@@ -1,11 +1,6 @@
-import time
 import traceback
 from utils.siglas import obter_sigla_estado
-from PySide6.QtCore import QMetaObject, Qt, QTimer
-from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,TAMANHOS_MAXIMOS, get_column_index, get_fallback_value,get_fallback_value_by_index, calcular_periodo, validar_estrutura_c170
-from services.spedService.atualizacoes import atualizar_aliquota
-from db.conexao import conectar_banco, fechar_banco
+from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corrigir_cst_icms,TAMANHOS_MAXIMOS, calcular_periodo, validar_estrutura_c170
 
 UNIDADE_PADRAO = "UN"
 
@@ -268,8 +263,8 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                 print(f"[ERRO] Falha no lote C170 {i}-{i+len(lote)}: {e}")
 
         conexao.commit()
-        print(f"[FINAL] Processamento concluído: {contadores}")
-        return f"Processado com sucesso. {contadores['salvos']} itens salvos, {contadores['erros']} com erro."
+        print(f"[FINAL] Processamento concluído: {contadores ['salvos']} salvos, {contadores['erros']} erros.")
+        return f"Processado com sucesso."
 
     except Exception as e:
         print("[FATAL] Erro durante o salvamento:", e)
