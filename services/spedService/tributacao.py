@@ -1,4 +1,3 @@
-import time
 from db.conexao import conectar_banco, fechar_banco
 
 async def criar_e_preencher_c170nova(empresa_id):
@@ -7,8 +6,6 @@ async def criar_e_preencher_c170nova(empresa_id):
     cursor = conexao.cursor()
 
     try:
-        tempo_inicio = time.time()
-
         cursor.execute("""
             INSERT INTO c170nova (
                 cod_item, periodo, reg, num_item, descr_compl, qtd, unid, 
@@ -62,8 +59,6 @@ async def criar_e_preencher_c170nova(empresa_id):
 
         total = cursor.rowcount
         conexao.commit()
-        print(f"[OK] {total} registros inseridos em c170nova.")
-        print(f"[TEMPO] Inserção concluída em {time.time() - tempo_inicio:.2f}s")
 
     except Exception as e:
         print(f"[ERRO] Falha em criar_e_preencher_c170nova: {e}")
