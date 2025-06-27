@@ -1,4 +1,3 @@
-from PySide6.QtCore import QTimer
 from db.conexao import conectar_banco, fechar_banco
 from services.fornecedorService import comparar_adicionar_atualizar_fornecedores
 from services.spedService.tributacao import criar_e_preencher_c170nova
@@ -32,6 +31,9 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     await atualizar_aliquota(empresa_id)
     print("[POS] Alíquotas atualizadas na tabela c170_clone.")
 
+    await corrigir_aliquota_decreto(empresa_id)
+    print("verificando e corrigindo aliquota com base no decreto")
+
     await atualizar_aliquotaRET(empresa_id)
     print("[POS] Alíquotas RET atualizadas na tabela c170_clone.")
 
@@ -57,9 +59,7 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     await atualizar_resultadoRET(empresa_id)
     print("[POS] Campo resultadoRET calculado com base em vl_item e aliquotaRET.")
 
-    await corrigir_aliquota_decreto(empresa_id)
-    print("verificando e corrigindo aliquota com base no decreto")
-    
     progress_bar.setValue(100)
     print("[POS] Pós-processamento concluído.")
+    progress_bar.setValue(0)
 
