@@ -1,4 +1,5 @@
 from PySide6 import QtWidgets, QtGui, QtCore
+from unidecode import unidecode
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_aviso, mensagem_sucesso, mensagem_error
 
@@ -19,7 +20,6 @@ class TelaProduto(QtWidgets.QWidget):
 
         screen = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos())
         screen_geometry = screen.availableGeometry() if screen else QtWidgets.QApplication.primaryScreen().availableGeometry()
-
         center_point = screen_geometry.center()
         self.move(center_point - self.rect().center())
 
@@ -29,7 +29,6 @@ class TelaProduto(QtWidgets.QWidget):
         self.search_input.setPlaceholderText("Buscar por qualquer campo...")
         self.search_input.setStyleSheet("background-color: white; color: black; padding: 5px; font-size: 14px;")
         self.search_input.textChanged.connect(self.filtrar_tabela)
-
         search_layout.addWidget(self.search_input)
         self.layout.addLayout(search_layout)
 
@@ -44,24 +43,19 @@ class TelaProduto(QtWidgets.QWidget):
 
     def _criar_botoes(self):
         botoes_layout = QtWidgets.QHBoxLayout()
-
         self.btn_adicionar = QtWidgets.QPushButton("Adicionar")
         self.btn_adicionar.setStyleSheet(self._estilo_botao("#28a745", "#218838"))
         self.btn_adicionar.clicked.connect(self.adicionar_produto)
-
         self.btn_editar = QtWidgets.QPushButton("Editar")
         self.btn_editar.setStyleSheet(self._estilo_botao("#007bff", "#0069d9"))
         self.btn_editar.clicked.connect(self.editar_produto)
-
         self.btn_excluir = QtWidgets.QPushButton("Excluir")
         self.btn_excluir.setStyleSheet(self._estilo_botao("#dc3545", "#c82333"))
         self.btn_excluir.clicked.connect(self.excluir_produto)
-
         for btn in [self.btn_adicionar, self.btn_editar, self.btn_excluir]:
             btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
             btn.setFont(QtGui.QFont("Arial", 12))
             botoes_layout.addWidget(btn)
-
         self.layout.addLayout(botoes_layout)
 
     def _estilo_botao(self, cor, hover):
@@ -83,19 +77,13 @@ class TelaProduto(QtWidgets.QWidget):
         conexao = conectar_banco()
         cursor = conexao.cursor()
         try:
-            cursor.execute("""
-                SELECT codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal
-                FROM cadastro_tributacao
-                WHERE empresa_id = %s
-            """, (self.empresa_id,))
+            cursor.execute("SELECT codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal FROM cadastro_tributacao WHERE empresa_id = %s", (self.empresa_id,))
             self.dados_originais = cursor.fetchall()
-
             for row_idx, row in enumerate(self.dados_originais):
                 self.tabela.insertRow(row_idx)
                 for col_idx, valor in enumerate(row):
                     item = QtWidgets.QTableWidgetItem(str(valor))
                     self.tabela.setItem(row_idx, col_idx, item)
-
         except Exception as e:
             mensagem_error(f"Erro ao carregar dados: {e}")
         finally:
@@ -105,7 +93,6 @@ class TelaProduto(QtWidgets.QWidget):
     def filtrar_tabela(self):
         termo = self.search_input.text().lower()
         self.tabela.setRowCount(0)
-
         for row in self.dados_originais:
             if any(termo in str(campo).lower() for campo in row):
                 row_idx = self.tabela.rowCount()
@@ -121,33 +108,23 @@ class TelaProduto(QtWidgets.QWidget):
         if linha < 0:
             mensagem_aviso("Selecione um produto para editar.")
             return
-
-        dados = [self.tabela.item(linha, i).text() for i in range(6)]
-        self._abrir_dialogo_edicao("editar", dados)
+        dados = [self.tabela.item(linha, i).text() if self.tabela.item(linha, i) else '' for i in range(6)]
+        dados_originais = dict(zip(['codigo', 'produto', 'ncm', 'aliquota', 'aliquotaRET', 'categoria_fiscal'], dados))
+        self._abrir_dialogo_edicao("editar", dados, dados_originais)
 
     def excluir_produto(self):
         linha = self.tabela.currentRow()
         if linha < 0:
             mensagem_aviso("Selecione um produto para excluir.")
             return
-
         codigo = self.tabela.item(linha, 0).text()
         produto = self.tabela.item(linha, 1).text()
-
-        confirmacao = QtWidgets.QMessageBox.question(
-            self, "Confirmar Exclusão",
-            f"Deseja excluir o produto '{produto}' (código: {codigo})?",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
-        )
-
+        confirmacao = QtWidgets.QMessageBox.question(self, "Confirmar Exclusão", f"Deseja excluir o produto '{produto}' (código: {codigo})?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if confirmacao == QtWidgets.QMessageBox.Yes:
             conexao = conectar_banco()
             cursor = conexao.cursor()
             try:
-                cursor.execute("""
-                    DELETE FROM cadastro_tributacao
-                    WHERE empresa_id = %s AND codigo = %s
-                """, (self.empresa_id, codigo))
+                cursor.execute("DELETE FROM cadastro_tributacao WHERE empresa_id = %s AND codigo = %s", (self.empresa_id, codigo))
                 conexao.commit()
                 mensagem_sucesso("Produto excluído com sucesso.")
                 self.carregar_dados()
@@ -158,57 +135,88 @@ class TelaProduto(QtWidgets.QWidget):
                 cursor.close()
                 fechar_banco(conexao)
 
-    def _abrir_dialogo_edicao(self, modo, dados=None):
+    def _abrir_dialogo_edicao(self, modo, dados=None, dados_originais=None):
         dialogo = QtWidgets.QDialog(self)
         dialogo.setWindowTitle("Editar Produto" if modo == "editar" else "Adicionar Produto")
+        dialogo.setFixedSize(400, 300)
         layout = QtWidgets.QFormLayout(dialogo)
-
+        layout.setVerticalSpacing(10)
         campos = {}
         labels = ['Código', 'Produto', 'NCM', 'Alíquota', 'Alíquota RET', 'Categoria Fiscal']
         for i, label in enumerate(labels):
             campo = QtWidgets.QLineEdit()
+            chave = unidecode(label.lower().replace(' ', '_'))
             if dados:
                 campo.setText(dados[i])
-            layout.addRow(label + ':', campo)
-            campos[label.lower().replace(' ', '_')] = campo
-
+            campos[chave] = campo
+            layout.addRow(f"{label}:", campo)
+        lista_campos = list(campos.values())
+        if lista_campos:
+            lista_campos[0].setFocus()
         botoes = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        botoes.accepted.connect(lambda: self._salvar_edicao(dialogo, campos, modo))
+        botoes.accepted.connect(lambda: self._salvar_edicao(dialogo, campos, modo, dados_originais))
         botoes.rejected.connect(dialogo.reject)
         layout.addRow(botoes)
 
         dialogo.exec()
 
-    def _salvar_edicao(self, dialogo, campos, modo):
+    def _salvar_edicao(self, dialogo, campos, modo, dados_originais=None):
         dados = {k: v.text().strip() for k, v in campos.items()}
+        for campo_nome, valor in dados.items():
+            if not valor:
+                mensagem_aviso(f"Preencha o campo '{campo_nome.replace('_', ' ').title()}'.")
+                return
+        for campo in ['aliquota', 'aliquota_ret']:
+            valor = dados[campo].strip().replace(',', '.')
+            if valor.replace('.', '', 1).isdigit():
+                dados[campo] = f"{valor}%"
+            else:
+                dados[campo] = valor
+
         conexao = conectar_banco()
         cursor = conexao.cursor()
+
         try:
-            if modo == "editar":
+            if modo.lower() == "editar":
+                campos_para_alterar = []
+                valores = []
+                for campo, valor in dados.items():
+                    if dados_originais.get(campo) != valor:
+                        campos_para_alterar.append(f"{campo} = %s")
+                        valores.append(valor)
+                if not campos_para_alterar:
+                    mensagem_aviso("Nenhum campo foi alterado.")
+                    return
                 cursor.execute("""
-                    UPDATE cadastro_tributacao
-                    SET produto = %s, ncm = %s, aliquota = %s, aliquotaRET = %s, categoria_fiscal = %s
-                    WHERE empresa_id = %s AND codigo = %s
+                    SELECT 1 FROM cadastro_tributacao
+                    WHERE empresa_id = %s AND codigo = %s AND produto = %s AND ncm = %s
+                    AND NOT (codigo = %s AND produto = %s AND ncm = %s)
                 """, (
-                    dados['produto'], dados['ncm'], dados['aliquota'],
-                    dados['aliquota_ret'], dados['categoria_fiscal'],
-                    self.empresa_id, dados['codigo']
+                    self.empresa_id, dados['codigo'], dados['produto'], dados['ncm'],
+                    dados_originais['codigo'], dados_originais['produto'], dados_originais['ncm']
                 ))
+                if cursor.fetchone():
+                    mensagem_aviso("Já existe um produto com essa combinação de código, produto e NCM.")
+                    return
+                query = f"UPDATE cadastro_tributacao SET {', '.join(campos_para_alterar)} WHERE empresa_id = %s AND codigo = %s AND produto = %s AND ncm = %s"
+                valores.extend([self.empresa_id, dados_originais['codigo'], dados_originais['produto'], dados_originais['ncm']])
+                cursor.execute(query, tuple(valores))
             else:
+                cursor.execute("SELECT 1 FROM cadastro_tributacao WHERE empresa_id = %s AND codigo = %s AND produto = %s AND ncm = %s", (self.empresa_id, dados['codigo'], dados['produto'], dados['ncm']))
+                if cursor.fetchone():
+                    mensagem_aviso("Produto já cadastrado. Verifique os dados.")
+                    return
                 cursor.execute("""
-                    INSERT INTO cadastro_tributacao
-                    (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal)
+                    INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    self.empresa_id, dados['codigo'], dados['produto'],
-                    dados['ncm'], dados['aliquota'], dados['aliquota_ret'],
-                    dados['categoria_fiscal']
-                ))
+                """, (self.empresa_id, dados['codigo'], dados['produto'], dados['ncm'], dados['aliquota'], dados['aliquotaRET'], dados['categoria_fiscal']))
             conexao.commit()
             mensagem_sucesso("Produto salvo com sucesso.")
             dialogo.accept()
             self.carregar_dados()
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             mensagem_error(f"Erro ao salvar: {e}")
             conexao.rollback()
         finally:
