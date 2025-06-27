@@ -4,6 +4,7 @@ from ui.telaPrincipal import MainWindow
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.icone import usar_icone
 from db.conexao import conectar_banco, fechar_banco, inicializar_banco
+from utils.icone import resource_path
 
 class WorkerInicializacao(QtCore.QThread):
     terminado = QtCore.Signal()
@@ -59,7 +60,7 @@ class EmpresaWindow(QtWidgets.QWidget):
         self.layout.setSpacing(10)
 
         self.logo_label = QtWidgets.QLabel()
-        pixmap = QtGui.QPixmap("images/logo.png").scaled(300, 300, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+        pixmap = QtGui.QPixmap(resource_path("images/logo.png")).scaled(300, 300, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
         self.logo_label.setPixmap(pixmap)
         self.logo_label.setAlignment(QtCore.Qt.AlignCenter)
         self.layout.addWidget(self.logo_label, alignment=QtCore.Qt.AlignCenter)

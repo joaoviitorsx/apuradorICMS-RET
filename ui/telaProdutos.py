@@ -7,7 +7,7 @@ class TelaProduto(QtWidgets.QWidget):
     def __init__(self, empresa_id):
         super().__init__()
         self.empresa_id = empresa_id
-        self.setWindowTitle("Gerenciar Produtos e Tributação")
+        self.setWindowTitle("Gerenciador de Produtos e Tributação")
         self.setGeometry(300, 150, 850, 600)
         self.setStyleSheet("background-color: #030d18; color: white;")
 
@@ -84,6 +84,9 @@ class TelaProduto(QtWidgets.QWidget):
                 for col_idx, valor in enumerate(row):
                     item = QtWidgets.QTableWidgetItem(str(valor))
                     self.tabela.setItem(row_idx, col_idx, item)
+
+            self.tabela.resizeColumnsToContents()
+
         except Exception as e:
             mensagem_error(f"Erro ao carregar dados: {e}")
         finally:
@@ -147,7 +150,6 @@ class TelaProduto(QtWidgets.QWidget):
             }
             QLineEdit:focus {
                 border-color: #007bff;
-                shadow: 0 0 10px rgba(0, 123, 255, 0.5);
             }
             QComboBox {
                 padding: 6px;

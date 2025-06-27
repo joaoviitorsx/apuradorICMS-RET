@@ -10,6 +10,7 @@ from services.spedService import sinal_popup
 from ui.popupAliquota import PopupAliquota
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
+from utils.icone import resource_path
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, empresa, empresa_id):
@@ -36,7 +37,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.layout.addLayout(self.stack_layout)
 
         self.imagem_placeholder = QtWidgets.QLabel()
-        self.imagem_placeholder.setPixmap(QtGui.QPixmap("images/logo.png").scaled(300, 300, QtCore.Qt.KeepAspectRatio))
+        self.imagem_placeholder.setPixmap(QtGui.QPixmap(resource_path("images/logo.png")).scaled(300, 300, QtCore.Qt.KeepAspectRatio))
         self.imagem_placeholder.setAlignment(QtCore.Qt.AlignCenter)
         self.stack_layout.addWidget(self.imagem_placeholder)
 
@@ -86,7 +87,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout_topo.addStretch()
 
         btn_icone = QtWidgets.QPushButton()
-        btn_icone.setIcon(QtGui.QIcon("images/config.png"))
+        btn_icone.setIcon(QtGui.QIcon(resource_path("images/config.png")))
         btn_icone.setIconSize(QtCore.QSize(32, 32))
         btn_icone.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         btn_icone.setStyleSheet("background-color: transparent; border: none;")
