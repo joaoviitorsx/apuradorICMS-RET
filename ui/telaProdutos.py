@@ -138,30 +138,104 @@ class TelaProduto(QtWidgets.QWidget):
     def _abrir_dialogo_edicao(self, modo, dados=None, dados_originais=None):
         dialogo = QtWidgets.QDialog(self)
         dialogo.setWindowTitle("Editar Produto" if modo == "editar" else "Adicionar Produto")
-        dialogo.setFixedSize(400, 300)
-        layout = QtWidgets.QFormLayout(dialogo)
-        layout.setVerticalSpacing(10)
+        dialogo.setFixedSize(420, 360)
+        dialogo.setStyleSheet("""
+            QLineEdit {
+                padding: 6px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            QLineEdit:focus {
+                border-color: #007bff;
+                shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+            }
+            QComboBox {
+                padding: 6px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            QComboBox:focus{
+                border-color: #007bff;
+            }
+            QLabel {
+                font-weight: bold;
+            }
+        """)
+
+        layout = QtWidgets.QVBoxLayout(dialogo)
+
+        form_layout = QtWidgets.QFormLayout()
+        form_layout.setVerticalSpacing(12)
+
         campos = {}
         labels = ['Código', 'Produto', 'NCM', 'Alíquota', 'Alíquota RET', 'Categoria Fiscal']
+        placeholders = ['Ex: 12345', 'Nome do produto', 'Ex: 1234.56.78', 'Ex: 18.00', 'Ex: 4.00', '']
+
         for i, label in enumerate(labels):
-            campo = QtWidgets.QLineEdit()
             chave = unidecode(label.lower().replace(' ', '_'))
-            if dados:
-                campo.setText(dados[i])
-            campos[chave] = campo
-            layout.addRow(f"{label}:", campo)
-        lista_campos = list(campos.values())
+
+            if label == 'Categoria Fiscal':
+                combo = QtWidgets.QComboBox()
+                opcoes = ["Regra Geral", "7% Cesta Básica", "12% Cesta Básica", "Bebida Alcoólica"]
+                combo.addItems(opcoes)
+
+                if dados:
+                    try:
+                        combo.setCurrentText(dados[i])
+                    except IndexError:
+                        pass
+
+                campos[chave] = combo
+                form_layout.addRow(f"{label}:", combo)
+            else:
+                campo = QtWidgets.QLineEdit()
+                if dados:
+                    campo.setText(dados[i])
+                campo.setPlaceholderText(placeholders[i])
+                campos[chave] = campo
+                form_layout.addRow(f"{label}:", campo)
+
+        lista_campos = [widget for widget in campos.values() if isinstance(widget, QtWidgets.QLineEdit)]
         if lista_campos:
             lista_campos[0].setFocus()
-        botoes = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        botoes.accepted.connect(lambda: self._salvar_edicao(dialogo, campos, modo, dados_originais))
-        botoes.rejected.connect(dialogo.reject)
-        layout.addRow(botoes)
+
+        layout.addLayout(form_layout)
+
+        botoes_layout = QtWidgets.QHBoxLayout()
+        btn_ok = QtWidgets.QPushButton("Salvar")
+        btn_cancelar = QtWidgets.QPushButton("Cancelar")
+
+        btn_ok.setIcon(QtGui.QIcon.fromTheme("dialog-ok"))
+        btn_cancelar.setIcon(QtGui.QIcon.fromTheme("dialog-cancel"))
+
+        btn_ok.clicked.connect(lambda: self._salvar_edicao(dialogo, campos, modo, dados_originais))
+        btn_cancelar.clicked.connect(dialogo.reject)
+
+        botoes_layout.addStretch()
+        botoes_layout.addWidget(btn_ok)
+        botoes_layout.addWidget(btn_cancelar)
+
+        layout.addLayout(botoes_layout)
 
         dialogo.exec()
 
     def _salvar_edicao(self, dialogo, campos, modo, dados_originais=None):
-        dados = {k: v.text().strip() for k, v in campos.items()}
+
+        CATEGORIA_MAPA = {
+            "Regra Geral": "regraGeral",
+            "7% Cesta Básica": "cestaBasica7",
+            "12% Cesta Básica": "cestaBasica12",
+            "Bebida Alcoólica": "bebidaAlcoolica"
+        }
+
+        dados = {}
+        for k, widget in campos.items():
+            if isinstance(widget, QtWidgets.QComboBox):
+                valor_visivel = widget.currentText()
+                dados[k] = CATEGORIA_MAPA.get(valor_visivel, valor_visivel)
+            else:
+                dados[k] = widget.text().strip()
+
         for campo_nome, valor in dados.items():
             if not valor:
                 mensagem_aviso(f"Preencha o campo '{campo_nome.replace('_', ' ').title()}'.")
@@ -177,12 +251,23 @@ class TelaProduto(QtWidgets.QWidget):
         cursor = conexao.cursor()
 
         try:
+            
+            MAPA_SQL = {
+                'aliquota_ret': 'aliquotaRET',
+                'categoria_fiscal': 'categoria_fiscal',
+                'aliquota': 'aliquota',
+                'codigo': 'codigo',
+                'produto': 'produto',
+                'ncm': 'ncm'
+            }
+
             if modo.lower() == "editar":
                 campos_para_alterar = []
                 valores = []
                 for campo, valor in dados.items():
                     if dados_originais.get(campo) != valor:
-                        campos_para_alterar.append(f"{campo} = %s")
+                        campo_sql = MAPA_SQL.get(campo, campo)
+                        campos_para_alterar.append(f"{campo_sql} = %s")
                         valores.append(valor)
                 if not campos_para_alterar:
                     mensagem_aviso("Nenhum campo foi alterado.")
@@ -209,14 +294,12 @@ class TelaProduto(QtWidgets.QWidget):
                 cursor.execute("""
                     INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (self.empresa_id, dados['codigo'], dados['produto'], dados['ncm'], dados['aliquota'], dados['aliquotaRET'], dados['categoria_fiscal']))
+                """, (self.empresa_id, dados['codigo'], dados['produto'], dados['ncm'], dados['aliquota'], dados['aliquota_ret'], dados['categoria_fiscal']))
             conexao.commit()
             mensagem_sucesso("Produto salvo com sucesso.")
             dialogo.accept()
             self.carregar_dados()
         except Exception as e:
-            import traceback
-            print(traceback.format_exc())
             mensagem_error(f"Erro ao salvar: {e}")
             conexao.rollback()
         finally:
