@@ -1,10 +1,9 @@
 import pandas as pd
 import unicodedata
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog
 from db.conexao import conectar_banco, fechar_banco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
-from ui.popupAliquota import PopupAliquota
 
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
@@ -168,67 +167,3 @@ def enviar_tributacao(empresa_id, progress_bar):
         cursor.close()
         fechar_banco(conexao)
 
-def atualizar_aliquota_c170_clone(empresa_id, periodo=None):
-    print("[EXPORTAÇÃO] Atualizando alíquotas na c170_clone...")
-    conexao = conectar_banco()
-    cursor = conexao.cursor()
-    try:
-        if periodo:
-            cursor.execute("""
-                UPDATE c170_clone c
-                JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = %s
-                SET c.aliquota = t.aliquota, c.aliquotaRET = t.aliquotaRET
-                WHERE (t.aliquota IS NOT NULL OR t.aliquotaRET IS NOT NULL)
-                  AND (TRIM(t.aliquota) <> '' OR TRIM(t.aliquotaRET) <> '')
-                  AND c.periodo = %s AND c.empresa_id = %s
-            """, (empresa_id, periodo, empresa_id))
-        else:
-            cursor.execute("""
-                UPDATE c170_clone c
-                JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = %s
-                SET c.aliquota = t.aliquota, c.aliquotaRET = t.aliquotaRET
-                WHERE (t.aliquota IS NOT NULL OR t.aliquotaRET IS NOT NULL)
-                  AND (TRIM(t.aliquota) <> '' OR TRIM(t.aliquotaRET) <> '')
-                  AND c.empresa_id = %s
-            """, (empresa_id, empresa_id))
-
-        conexao.commit()
-        print("[EXPORTAÇÃO] Alíquotas e RET atualizados com sucesso.")
-    except Exception as e:
-        conexao.rollback()
-        print(f"[ERRO] ao atualizar alíquotas: {e}")
-    finally:
-        cursor.close()
-        fechar_banco(conexao)
-
-def atualizar_aliquota_c170_clone(empresa_id, periodo=None):
-    print("[EXPORTAÇÃO] Atualizando alíquotas na c170_clone...")
-    conexao = conectar_banco()
-    cursor = conexao.cursor()
-    try:
-        if periodo:
-            cursor.execute("""
-                UPDATE c170_clone c
-                JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = %s
-                SET c.aliquota = t.aliquota
-                WHERE t.aliquota IS NOT NULL 
-                  AND TRIM(t.aliquota) <> '' 
-                  AND c.periodo = %s AND c.empresa_id = %s
-            """, (empresa_id, periodo, empresa_id))
-        else:
-            cursor.execute("""
-                UPDATE c170_clone c
-                JOIN cadastro_tributacao t ON c.cod_item = t.codigo AND t.empresa_id = %s
-                SET c.aliquota = t.aliquota
-                WHERE t.aliquota IS NOT NULL 
-                  AND TRIM(t.aliquota) <> '' AND c.empresa_id = %s
-            """, (empresa_id, empresa_id))
-
-        conexao.commit()
-        print("[EXPORTAÇÃO] Alíquotas atualizadas com sucesso.")
-    except Exception as e:
-        conexao.rollback()
-        print(f"[ERRO] ao atualizar alíquotas: {e}")
-    finally:
-        cursor.close()
-        fechar_banco(conexao)
