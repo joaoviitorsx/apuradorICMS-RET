@@ -1,10 +1,9 @@
 import pandas as pd
-from unidecode import unidecode
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QHBoxLayout, QMessageBox, QApplication
 from PySide6.QtCore import Qt
 from PySide6 import QtGui
-from utils.aliquota_uf import identificar_categoria, obter_aliquota, preencherAliquotaRET
-from utils.aliquota import formatar_aliquota, eh_aliquota_numerica
+from utils.ret import preencherAliquotaRET
+from utils.aliquota import formatar_aliquota
 from db.conexao import conectar_banco, fechar_banco
 from utils.mensagem import mensagem_sucesso, mensagem_error
 
@@ -92,6 +91,8 @@ class PopupAliquota(QDialog):
             item_aliquota = QTableWidgetItem(aliquota if aliquota else "")
             item_aliquota.setFlags(item_aliquota.flags() | Qt.ItemIsEditable)
             self.tabela.setItem(row_idx, 4, item_aliquota)
+        
+        self.tabela.resizeColumnsToContents()
 
     def salvar_dados(self):
         print("[SALVAR] Iniciando atualização de alíquotas")
