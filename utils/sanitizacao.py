@@ -11,20 +11,6 @@ TAMANHOS_MAXIMOS = {
     'nome': 100,
 }
 
-def limpar_aliquota(valor):
-    if not valor:
-        return None
-    valor = str(valor).strip().replace('%', '').replace(',', '.')
-    try:
-        num = float(valor)
-        if num == 0:
-            return '0%'
-        return f"{num:.2f}%"
-    except ValueError:
-        valor_upper = valor.upper()
-        if valor_upper in ["ST", "ISENTO", "PAUTA"]:
-            return valor_upper
-        return None
     
 def truncar(valor, limite):
     if valor is None:
@@ -84,7 +70,6 @@ def corrigir_ind_mov(valor):
     
     valor_str = str(valor)
     if len(valor_str) > 1:
-        #print(f"[TRUNCAR] ind_mov: '{valor_str}' → '{valor_str[:1]}'")
         return valor_str[:1]
     
     return valor_str
@@ -115,7 +100,6 @@ def validar_estrutura_c170(dados):
     except Exception as e:
         print(f"[ERRO] Falha ao validar C170: {e}")
         return False
-
 
 def sanitizar_campo(campo, valor):
     regras = {
@@ -156,78 +140,8 @@ def sanitizar_campo(campo, valor):
 def sanitizar_registro(registro_dict):
     return {campo: sanitizar_campo(campo, valor) for campo, valor in registro_dict.items()}
 
-def get_column_index(column_name):
-    indices = {
-        'periodo': 0,
-        'reg': 1,
-        'num_item': 2,
-        'cod_item': 3,
-        'descr_compl': 4,
-        'qtd': 5,
-        'unid': 6,
-        'vl_item': 7,
-        'vl_desc': 8,
-        'ind_mov': 9,
-        'cst_icms': 10,
-        'cfop': 11,
-        'cod_nat': 12,
-        'vl_bc_icms': 13,
-        'aliq_icms': 14,
-        'vl_icms': 15,
-        'cod_cta': 37,
-        'id_c100': 40,
-        'filial': 41,
-        'ind_oper': 42,
-        'cod_part': 43,
-        'num_doc': 44,
-        'chv_nfe': 45,
-    }
-    if column_name not in indices:
-        print(f"[AVISO] get_column_index: coluna '{column_name}' não mapeada.")
-    return indices.get(column_name, -1)
-
-def get_fallback_value(column_name):
-    fallbacks = {
-        'unid': 'UN',
-        'ind_mov': '0',
-        'cod_item': '0000',
-        'descr_compl': '-',
-        'cod_nat': '000',
-        'cod_cta': '-',
-        'cfop': '5102',
-        'cst_icms': '00',
-    }
-    return fallbacks.get(column_name, None)
-
-def get_fallback_value_by_index(index):
-    index_to_column = {
-        3: 'cod_item',
-        4: 'descr_compl',
-        6: 'unid',
-        9: 'ind_mov',
-        10: 'cst_icms',
-        11: 'cfop',
-        12: 'cod_nat',
-        37: 'cod_cta',
-    }
-    column_name = index_to_column.get(index)
-    return get_fallback_value(column_name) if column_name else None
-
 def calcular_periodo(dt_ini_0000):
     return f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
 
-def is_aliquota_valida(valor: str) -> bool:
-    if not isinstance(valor, str):
-        return False
-
-    padrao = r'^[0-2]?[0-9](,[0-9]{1,2})?%$'
-    if not re.match(padrao, valor):
-        return False
-
-    try:
-        num = float(valor.replace('%', '').replace(',', '.'))
-        return 0 <= num <= 30
-    except ValueError:
-        return False
 
 

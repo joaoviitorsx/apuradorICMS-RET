@@ -1,15 +1,3 @@
-import math
-
-def eh_aliquota_numerica(valor):
-    try:
-        valor = str(valor).strip().upper()
-        if valor in ['ISENTO', 'ST', 'PAUTA', 'N/A', '']:
-            return False
-        float(valor.replace('%', '').replace(',', '.'))
-        return True
-    except:
-        return False
-
 def formatar_aliquota(valor):
     try:
         if valor is None:
