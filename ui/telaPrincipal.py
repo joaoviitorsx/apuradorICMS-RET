@@ -1,7 +1,6 @@
 import os
-import asyncio
 from PySide6 import QtWidgets, QtGui, QtCore
-from PySide6.QtWidgets import QMessageBox, QDialog, QFileDialog, QApplication
+from PySide6.QtWidgets import QMessageBox, QFileDialog, QApplication
 from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
 from services.spedService.carregamento import iniciar_processamento_sped
