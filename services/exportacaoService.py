@@ -1,10 +1,7 @@
-import os
 import time
 import xlsxwriter
-from decimal import Decimal
 from PySide6.QtCore import QThread, Signal
 from utils.aliquota import formatar_aliquota
-from utils.conversao import Conversor
 from db.conexao import conectar_banco, fechar_banco
 
 class ExportWorker(QThread):
