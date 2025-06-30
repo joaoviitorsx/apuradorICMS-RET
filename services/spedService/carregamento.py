@@ -56,7 +56,7 @@ def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=N
 
     print(f"[DEBUG] {len(caminhos)} arquivo(s) selecionado(s):")
     for i, caminho in enumerate(caminhos):
-        print(f"[DEBUG]   {i+1}. {os.path.basename(caminho)} ({os.path.getsize(caminho)/1024:.1f} KB)")
+        print(f"[DEBUG] {i+1}. {os.path.basename(caminho)} ({os.path.getsize(caminho)/1024:.1f} KB)")
 
     thread = threading.Thread(
         target=processar_sped_thread,
