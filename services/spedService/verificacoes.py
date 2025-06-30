@@ -1,8 +1,5 @@
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog
 from PySide6.QtCore import QObject, Signal, QEventLoop
 from db.conexao import conectar_banco, fechar_banco
-from ui.popupAliquota import PopupAliquota
-from difflib import SequenceMatcher
 
 class SinalPopup(QObject):
     abrir_popup_signal = Signal(int, object)
