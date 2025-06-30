@@ -62,4 +62,3 @@ async def etapas_pos_processamento(empresa_id, progress_bar, janela_pai=None):
     progress_bar.setValue(100)
     print("[POS] Pós-processamento concluído.")
     progress_bar.setValue(0)
-
