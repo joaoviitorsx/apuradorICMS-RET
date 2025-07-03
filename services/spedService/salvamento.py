@@ -357,7 +357,7 @@ async def salvarDados(conteudo, cursor, conexao, empresa_id, janela=None):
 
         conexao.commit()
         print(f"[FINAL] Processamento concluído: {contadores['salvos']} salvos, {contadores['erros']} erros.")
-        return f"Processado com sucesso."
+        return f"Processamento finalizado e dados salvos no banco."
 
     except Exception as e:
         print("[FATAL] Erro durante o salvamento:", e)
