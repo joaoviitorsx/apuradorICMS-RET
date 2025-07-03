@@ -15,11 +15,10 @@ async def salvarDados(conteudo, cursor, conexao, empresa_id, janela=None):
             dt_ini_0000 = partes[3]
             periodo = calcular_periodo(dt_ini_0000)
 
-            cursor.execute("SELECT COUNT(*) FROM `0000` WHERE periodo = %s AND empresa_id = %s", 
-                           (periodo, empresa_id))
+            cursor.execute("SELECT COUNT(*) FROM `0000` WHERE periodo = %s AND empresa_id = %s", (periodo, empresa_id))
+                           
             if cursor.fetchone()[0] > 0:
-                cursor.execute("SELECT COUNT(*) FROM c170 WHERE periodo = %s AND empresa_id = %s", 
-                               (periodo, empresa_id))
+                cursor.execute("SELECT COUNT(*) FROM c170 WHERE periodo = %s AND empresa_id = %s", (periodo, empresa_id))
                 count_c170 = cursor.fetchone()[0]
                 raise ValueError(f"SPED do período {periodo} já foi processado anteriormente. {count_c170} itens já existem no banco.")
             break

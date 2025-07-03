@@ -1,6 +1,7 @@
 import xlsxwriter
 from PySide6.QtCore import QThread, Signal
 from utils.aliquota import formatarAliquota
+from utils.conversao import Conversor
 from db.conexao import conectarBanco, fecharBanco
 
 class ExportWorker(QThread):
@@ -102,6 +103,8 @@ class ExportWorker(QThread):
 
                     if nome_coluna in {'aliquota', 'aliquotaRET'}:
                         valor = formatarAliquota(valor)
+                        valorNumerico = Conversor(valor)
+                        valor = f"{valorNumerico:.2f}%".replace('.', ',')
 
                     elif nome_coluna in colunas_numericas:
                         try:

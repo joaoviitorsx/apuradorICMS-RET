@@ -1,0 +1,381 @@
+-- Criação do banco de dados (opcional, dependendo da configuração do servidor)
+-- CREATE DATABASE IF NOT EXISTS apurador_icms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE apurador_icms;
+
+-- Tabela de empresas
+CREATE TABLE IF NOT EXISTS empresas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cnpj VARCHAR(20),
+    razao_social VARCHAR(100)
+);
+
+-- Tabela 0000
+CREATE TABLE IF NOT EXISTS `0000` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    reg VARCHAR(10),
+    cod_ver VARCHAR(10),
+    cod_fin VARCHAR(10),
+    dt_ini VARCHAR(10),
+    dt_fin VARCHAR(10),
+    nome VARCHAR(100),
+    cnpj VARCHAR(20),
+    cpf VARCHAR(20),
+    uf VARCHAR(5),
+    ie VARCHAR(20),
+    cod_num VARCHAR(20),
+    im VARCHAR(20),
+    suframa VARCHAR(20),
+    ind_perfil VARCHAR(10),
+    ind_ativ VARCHAR(10),
+    filial VARCHAR(10),
+    periodo VARCHAR(10),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela 0150
+CREATE TABLE IF NOT EXISTS `0150` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    reg VARCHAR(10),
+    cod_part VARCHAR(60),
+    nome VARCHAR(100),
+    cod_pais VARCHAR(10),
+    cnpj VARCHAR(20),
+    cpf VARCHAR(20),
+    ie VARCHAR(20),
+    cod_mun VARCHAR(20),
+    suframa VARCHAR(20),
+    ende VARCHAR(100),
+    num VARCHAR(20),
+    compl VARCHAR(20),
+    bairro VARCHAR(50),
+    cod_uf VARCHAR(10),
+    uf VARCHAR(5),
+    pj_pf VARCHAR(5),
+    periodo VARCHAR(10),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela 0200
+CREATE TABLE IF NOT EXISTS `0200` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    reg VARCHAR(10),
+    cod_item VARCHAR(60),
+    descr_item VARCHAR(255),
+    cod_barra VARCHAR(60),
+    cod_ant_item VARCHAR(60),
+    unid_inv VARCHAR(10),
+    tipo_item VARCHAR(10),
+    cod_ncm VARCHAR(20),
+    ex_ipi VARCHAR(10),
+    cod_gen VARCHAR(10),
+    cod_list VARCHAR(10),
+    aliq_icms VARCHAR(10),
+    cest VARCHAR(10),
+    periodo VARCHAR(10),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela c100
+CREATE TABLE IF NOT EXISTS c100 (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    periodo VARCHAR(10),
+    reg VARCHAR(10),
+    ind_oper VARCHAR(5),
+    ind_emit VARCHAR(5),
+    cod_part VARCHAR(60),
+    cod_mod VARCHAR(10),
+    cod_sit VARCHAR(10),
+    ser VARCHAR(10),
+    num_doc VARCHAR(20),
+    chv_nfe VARCHAR(60),
+    dt_doc VARCHAR(10),
+    dt_e_s VARCHAR(10),
+    vl_doc VARCHAR(20),
+    ind_pgto VARCHAR(5),
+    vl_desc VARCHAR(20),
+    vl_abat_nt VARCHAR(20),
+    vl_merc VARCHAR(20),
+    ind_frt VARCHAR(5),
+    vl_frt VARCHAR(20),
+    vl_seg VARCHAR(20),
+    vl_out_da VARCHAR(20),
+    vl_bc_icms VARCHAR(20),
+    vl_icms VARCHAR(20),
+    vl_bc_icms_st VARCHAR(20),
+    vl_icms_st VARCHAR(20),
+    vl_ipi VARCHAR(20),
+    vl_pis VARCHAR(20),
+    vl_cofins VARCHAR(20),
+    vl_pis_st VARCHAR(20),
+    vl_cofins_st VARCHAR(20),
+    filial VARCHAR(10),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela c170
+CREATE TABLE IF NOT EXISTS c170 (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT NOT NULL,
+    periodo VARCHAR(10),
+    reg VARCHAR(10),
+    num_item VARCHAR(10),
+    cod_item VARCHAR(60),
+    descr_compl VARCHAR(255),
+    qtd VARCHAR(20),
+    unid VARCHAR(10),
+    vl_item VARCHAR(20),
+    vl_desc VARCHAR(20),
+    ind_mov VARCHAR(5),
+    cst_icms VARCHAR(10),
+    cfop VARCHAR(10),
+    cod_nat VARCHAR(11),
+    vl_bc_icms VARCHAR(20),
+    aliq_icms VARCHAR(10),
+    vl_icms VARCHAR(20),
+    vl_bc_icms_st VARCHAR(20),
+    aliq_st VARCHAR(10),
+    vl_icms_st VARCHAR(20),
+    ind_apur VARCHAR(5),
+    cst_ipi VARCHAR(10),
+    cod_enq VARCHAR(10),
+    vl_bc_ipi VARCHAR(20),
+    aliq_ipi VARCHAR(10),
+    vl_ipi VARCHAR(20),
+    cst_pis VARCHAR(10),
+    vl_bc_pis VARCHAR(20),
+    aliq_pis VARCHAR(10),
+    quant_bc_pis VARCHAR(20),
+    aliq_pis_reais VARCHAR(20),
+    vl_pis VARCHAR(20),
+    cst_cofins VARCHAR(10),
+    vl_bc_cofins VARCHAR(20),
+    aliq_cofins VARCHAR(10),
+    quant_bc_cofins VARCHAR(20),
+    aliq_cofins_reais VARCHAR(20),
+    vl_cofins VARCHAR(20),
+    cod_cta VARCHAR(255),
+    vl_abat_nt VARCHAR(20),
+    id_c100 INT,
+    filial VARCHAR(10),
+    ind_oper VARCHAR(5),
+    cod_part VARCHAR(60),
+    num_doc VARCHAR(20),
+    chv_nfe VARCHAR(60),
+    ncm VARCHAR(44) DEFAULT '',
+    mercado VARCHAR(15) DEFAULT '',
+    aliquota VARCHAR(10) DEFAULT '',
+    resultado VARCHAR(20),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela cadastro_tributacao
+CREATE TABLE IF NOT EXISTS cadastro_tributacao (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    codigo VARCHAR(60),
+    produto VARCHAR(255),
+    ncm VARCHAR(20),
+    aliquota VARCHAR(10),
+    aliquota_antiga VARCHAR(10),
+    aliquotaRET VARCHAR(10),
+    categoria_fiscal VARCHAR(50),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela cadastro_fornecedores
+CREATE TABLE IF NOT EXISTS cadastro_fornecedores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    cod_part VARCHAR(60),
+    nome VARCHAR(100),
+    cnpj VARCHAR(20),
+    uf VARCHAR(5),
+    cnae VARCHAR(20),
+    decreto VARCHAR(10),
+    simples VARCHAR(10),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela c170_clone
+CREATE TABLE IF NOT EXISTS c170_clone (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    periodo VARCHAR(10),
+    reg VARCHAR(10),
+    num_item VARCHAR(10),
+    cod_item VARCHAR(60),
+    descr_compl VARCHAR(255),
+    qtd DECIMAL(15,4),
+    unid VARCHAR(10),
+    vl_item DECIMAL(15,2),
+    vl_desc DECIMAL(15,2),
+    cfop VARCHAR(10),
+    cst VARCHAR(3),
+    ncm VARCHAR(40),      
+    id_c100 INT,
+    filial VARCHAR(10),
+    ind_oper VARCHAR(5),
+    cod_part VARCHAR(60),
+    num_doc VARCHAR(20),
+    chv_nfe VARCHAR(60),
+    uf VARCHAR(3),
+    aliquota VARCHAR(10),
+    aliquotaRET VARCHAR(10),
+    resultado DECIMAL(15,2),
+    resultadoRET DECIMAL(15,2),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela c170nova
+CREATE TABLE IF NOT EXISTS c170nova (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT,
+    cod_item VARCHAR(60),
+    periodo VARCHAR(10),
+    reg VARCHAR(10),
+    uf VARCHAR(3),
+    num_item VARCHAR(10),
+    descr_compl VARCHAR(255),
+    cod_ncm VARCHAR(40),
+    qtd VARCHAR(20),
+    unid VARCHAR(10),
+    vl_item VARCHAR(20),
+    vl_desc VARCHAR(20),
+    cst VARCHAR(10),
+    cfop VARCHAR(10),
+    id_c100 VARCHAR(10),
+    filial VARCHAR(10),
+    ind_oper VARCHAR(5),
+    cod_part VARCHAR(60),
+    num_doc VARCHAR(20),
+    chv_nfe VARCHAR(60),
+    INDEX idx_empresa (empresa_id)
+);
+
+-- Tabela cadastroAliquotaTermo
+CREATE TABLE IF NOT EXISTS cadastroAliquotaTermo (
+    codigo INT PRIMARY KEY,
+    uf VARCHAR(50),
+    regiao VARCHAR(50),
+    regra_geral FLOAT,
+    cesta_basica_7 FLOAT,
+    cesta_basica_12 FLOAT,
+    bebida_alcoolica FLOAT
+);
+
+-- Tabela decreto
+CREATE TABLE IF NOT EXISTS decreto (
+    codigo INT PRIMARY KEY,
+    uf VARCHAR(50),
+    regiao VARCHAR(50),
+    regra_geral FLOAT,
+    cesta_basica_7 FLOAT,
+    cesta_basica_12 FLOAT,
+    bebida_alcoolica FLOAT
+);
+
+-- Criação dos índices adicionais
+ALTER TABLE c170 ADD INDEX IF NOT EXISTS idx_c170_cod_item_empresa (cod_item, empresa_id);
+ALTER TABLE cadastro_tributacao ADD INDEX IF NOT EXISTS idx_tributacao_codigo_empresa (codigo, empresa_id);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_cod_item_empresa (cod_item, empresa_id);
+ALTER TABLE `0200` ADD INDEX IF NOT EXISTS idx_0200_cod_item_empresa (cod_item, empresa_id);
+ALTER TABLE c170nova ADD INDEX IF NOT EXISTS idx_c170nova_cod_item_empresa (cod_item, empresa_id);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_codpart_empresa_periodo (cod_part, empresa_id, periodo);
+ALTER TABLE cadastro_fornecedores ADD INDEX IF NOT EXISTS idx_fornecedor_codpart_empresa (cod_part, empresa_id);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_empresa_periodo (empresa_id, periodo);
+ALTER TABLE cadastro_tributacao ADD INDEX IF NOT EXISTS idx_tributacao_empresa_aliquota (empresa_id, aliquota);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_aliquota_empresa (empresa_id, aliquota);
+ALTER TABLE cadastro_fornecedores ADD INDEX IF NOT EXISTS idx_fornecedor_empresa_simples (empresa_id, simples);
+ALTER TABLE `0200` ADD INDEX IF NOT EXISTS idx_0200_empresa_coditem_descr (empresa_id, cod_item, descr_item);
+ALTER TABLE c170nova ADD INDEX IF NOT EXISTS idx_c170nova_empresa_coditem_descr (empresa_id, cod_item, descr_compl);
+ALTER TABLE c170 ADD INDEX IF NOT EXISTS idx_c170_chv_nfe (chv_nfe);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_chv_nfe (chv_nfe);
+ALTER TABLE c170nova ADD INDEX IF NOT EXISTS idx_c170nova_chv_nfe (chv_nfe);
+ALTER TABLE c170 ADD INDEX IF NOT EXISTS idx_c170_empresa_cfop (empresa_id, cfop);
+ALTER TABLE c100 ADD INDEX IF NOT EXISTS idx_c100_id_codpart_empresa (id, cod_part, empresa_id);
+ALTER TABLE cadastro_fornecedores ADD INDEX IF NOT EXISTS idx_fornecedores_empresa_uf_decreto (empresa_id, uf, decreto);
+ALTER TABLE cadastro_tributacao ADD INDEX IF NOT EXISTS idx_tributacao_produto_ncm_empresa (produto, ncm, empresa_id);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_produto_ncm_empresa (descr_compl, ncm, empresa_id);
+ALTER TABLE c170_clone ADD INDEX IF NOT EXISTS idx_c170clone_empresa_produto_ncm_aliquota (empresa_id, descr_compl, ncm, aliquota);
+ALTER TABLE cadastro_tributacao ADD UNIQUE INDEX IF NOT EXISTS uniq_empresa_codigo_produto_ncm (empresa_id, codigo, produto(255), ncm);
+ALTER TABLE `0150` ADD INDEX IF NOT EXISTS idx_0150_codpart_empresa (cod_part, empresa_id);
+ALTER TABLE `0000` ADD UNIQUE INDEX IF NOT EXISTS uniq_0000_periodo_empresa (periodo, empresa_id);
+ALTER TABLE c170 ADD INDEX IF NOT EXISTS idx_c170_unico_c100_item (id_c100, num_item, cod_item);
+
+-- Inserção dos dados fixos na tabela cadastroAliquotaTermo
+INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
+(12, 'AC', 'norte', 8.31, 4.16, 5.12, 19.84),
+(27, 'AL', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(16, 'AP', 'norte', 8.31, 4.16, 5.12, 19.84),
+(13, 'AM', 'norte', 8.31, 4.16, 5.12, 19.84),
+(29, 'BA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(23, 'CE', 'interno', 4.08, 2.19, 2.99, 4.78),
+(53, 'DF', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+(32, 'ES', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+(52, 'GO', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+(21, 'MA', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(51, 'MT', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+(50, 'MS', 'centro-oeste', 8.31, 4.16, 5.12, 19.84),
+(31, 'MG', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+(15, 'PA', 'norte', 8.31, 4.16, 5.12, 19.84),
+(25, 'PB', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(41, 'PR', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+(26, 'PE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(22, 'PI', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(24, 'RN', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(43, 'RS', 'sul', 10.96, 5.12, 6.58, 24.68),
+(33, 'RJ', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+(11, 'RO', 'norte', 8.31, 4.16, 5.12, 19.84),
+(14, 'RR', 'norte', 8.31, 4.16, 5.12, 19.84),
+(42, 'SC', 'sul', 10.96, 5.12, 6.58, 24.68),
+(35, 'SP', 'sudeste', 10.96, 5.12, 6.58, 24.68),
+(28, 'SE', 'nordeste', 8.31, 4.16, 5.12, 19.84),
+(17, 'TO', 'norte', 8.31, 4.16, 5.12, 19.84)
+ON DUPLICATE KEY UPDATE 
+    uf = VALUES(uf),
+    regiao = VALUES(regiao),
+    regra_geral = VALUES(regra_geral),
+    cesta_basica_7 = VALUES(cesta_basica_7),
+    cesta_basica_12 = VALUES(cesta_basica_12),
+    bebida_alcoolica = VALUES(bebida_alcoolica);
+
+-- Inserção dos dados fixos na tabela decreto
+INSERT INTO decreto (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
+(12, 'AC', 'norte', 12.00, 4.20, 7.20, 30.39),
+(27, 'AL', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(16, 'AP', 'norte', 12.00, 4.20, 7.20, 30.39),
+(13, 'AM', 'norte', 12.00, 4.20, 7.20, 30.39),
+(29, 'BA', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(23, 'CE', 'interno', 4.00, 1.54, 2.63, 8.13),
+(53, 'DF', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+(32, 'ES', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+(52, 'GO', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+(21, 'MA', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(51, 'MT', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+(50, 'MS', 'centro-oeste', 12.00, 4.20, 7.20, 30.39),
+(31, 'MG', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+(15, 'PA', 'norte', 12.00, 4.20, 7.20, 30.39),
+(25, 'PB', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(41, 'PR', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+(26, 'PE', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(22, 'PI', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(24, 'RN', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(43, 'RS', 'sul', 17.00, 5.95, 10.20, 37.80),
+(33, 'RJ', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+(11, 'RO', 'norte', 12.00, 4.20, 7.20, 30.39),
+(14, 'RR', 'norte', 12.00, 4.20, 7.20, 30.39),
+(42, 'SC', 'sul', 17.00, 5.95, 10.20, 37.80),
+(35, 'SP', 'sudeste', 17.00, 5.95, 10.20, 37.80),
+(28, 'SE', 'nordeste', 12.00, 4.20, 7.20, 30.39),
+(17, 'TO', 'norte', 12.00, 4.20, 7.20, 30.39)
+ON DUPLICATE KEY UPDATE
+    uf = VALUES(uf),
+    regiao = VALUES(regiao),
+    regra_geral = VALUES(regra_geral),
+    cesta_basica_7 = VALUES(cesta_basica_7),
+    cesta_basica_12 = VALUES(cesta_basica_12),
+    bebida_alcoolica = VALUES(bebida_alcoolica);

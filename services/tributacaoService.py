@@ -4,7 +4,6 @@ from PySide6.QtWidgets import QFileDialog
 from db.conexao import conectarBanco, fecharBanco
 from utils.aliquota import formatarAliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
-from ui.popupAliquota import PopupAliquota
 
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
