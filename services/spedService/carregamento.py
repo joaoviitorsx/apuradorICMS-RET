@@ -68,18 +68,18 @@ def iniciarProcessamentoSped(empresa_id, progress_bar, label_arquivo, janela=Non
 async def processarSped(empresa_id, progress_bar, label_arquivo, caminhos, janela=None):
     print(f"[DEBUG] Iniciando processamento de {len(caminhos)} arquivo(s) SPED...")
 
-    conexao_cheque = conectarBanco()
-    if not conexao_cheque:
+    conexaoCheck = conectarBanco()
+    if not conexaoCheck:
         return False, "Erro ao conectar ao banco"
 
-    cursor_cheque = conexao_cheque.cursor()
-    cursor_cheque.execute("SHOW TABLES LIKE 'cadastro_tributacao'")
-    if not cursor_cheque.fetchone():
-        cursor_cheque.close()
-        fecharBanco(conexao_cheque)
+    checagem = conexaoCheck.cursor()
+    checagem.execute("SHOW TABLES LIKE 'cadastro_tributacao'")
+    if not checagem.fetchone():
+        checagem.close()
+        fecharBanco(conexaoCheck)
         return False, "Tributação não encontrada. Envie primeiro a tributação."
-    cursor_cheque.close()
-    fecharBanco(conexao_cheque)
+    checagem.close()
+    fecharBanco(conexaoCheck)
 
     total = len(caminhos)
     progresso_por_arquivo = math.ceil(100 / total) if total > 0 else 100
@@ -129,15 +129,35 @@ async def processarSped(empresa_id, progress_bar, label_arquivo, caminhos, janel
         else:
             return False, mensagem or "Erro durante salvamento em lote."
 
+    except ValueError as ve:
+        print(f"[AVISO] Processamento interrompido: {ve}")
+        if conexao:
+            try:
+                cursor.close()
+                fecharBanco(conexao)
+            except:
+                pass
+        progress_bar.setValue(0)
+        label_arquivo.setText("Processamento interrompido.")
+        return False, str(ve)
     except Exception as e:
         import traceback
         print("[ERRO] Falha no processar_sped:", traceback.format_exc())
+        if conexao:
+            try:
+                cursor.close()
+                fecharBanco(conexao)
+            except:
+                pass
+        progress_bar.setValue(0)
+        label_arquivo.setText("Erro no processamento.")
         return False, f"Erro inesperado durante o processamento: {e}"
 
     finally:
-        try:
-            fecharBanco(conexao)
-        except:
-            pass
+        if conexao:
+            try:
+                fecharBanco(conexao)
+            except:
+                pass
         await asyncio.sleep(0.5)
         label_arquivo.setText("Processamento finalizado.")
