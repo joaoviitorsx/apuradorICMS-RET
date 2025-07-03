@@ -1,3 +1,4 @@
+import asyncio
 from PySide6.QtCore import QObject, Signal, QEventLoop
 from db.conexao import conectarBanco, fecharBanco
 
@@ -8,49 +9,58 @@ class SinalPopup(QObject):
         super().__init__()
         self.resultado_popup = None
         self.event_loop = None
-        self.popup_aberto = False
+        self._lock = asyncio.Lock()
+        self._popup_ativo = False
 
 sinal_popup = SinalPopup()
 
 async def verificaoPopupAliquota(empresa_id, janela_pai=None):
     print(f"[INFO] Verificando alíquotas nulas para empresa_id={empresa_id}...")
 
-    if sinal_popup.popup_aberto:
-        print("[INFO] Popup já aberto")
-        return
+    async with sinal_popup._lock:
+        if sinal_popup._popup_ativo:
+            print("[INFO] Popup já está sendo processado por outra operação")
+            return
+        
+        sinal_popup._popup_ativo = True
     
-    conexao = conectarBanco()
-    cursor = conexao.cursor()
-
     try:
-        cursor.execute("""
-            SELECT COUNT(*) FROM (
-                SELECT MIN(codigo) AS codigo, produto, ncm
-                FROM cadastro_tributacao
-                WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
-                GROUP BY produto, ncm
-            ) AS sub
-        """, (empresa_id,))
-        count = cursor.fetchone()[0]
+        conexao = conectarBanco()
+        cursor = conexao.cursor()
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) FROM (
+                    SELECT MIN(codigo) AS codigo, produto, ncm
+                    FROM cadastro_tributacao
+                    WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
+                    GROUP BY produto, ncm
+                ) AS sub
+            """, (empresa_id,))
+            count = cursor.fetchone()[0]
+        finally:
+            cursor.close()
+            fecharBanco(conexao)
+
+        print("[INFO] Conexão com banco encerrada.")
+
+        if count > 0:
+            print(f"[INFO] Existem {count} alíquotas nulas. Solicitando preenchimento via popup...")
+
+            sinal_popup.event_loop = QEventLoop()
+            sinal_popup.resultado_popup = None
+            sinal_popup.abrir_popup_signal.emit(empresa_id, janela_pai)
+            sinal_popup.event_loop.exec()
+
+        else:
+            print("[INFO] Nenhuma alíquota nula encontrada.")
+
+    except Exception as e:
+        print(f"[ERRO] Falha na verificação de popup: {e}")
+        raise
     finally:
-        cursor.close()
-        fecharBanco(conexao)
-
-    print("[INFO] Conexão com banco encerrada.")
-
-    if count > 0:
-        print(f"[INFO] Existem {count} alíquotas nulas. Solicitando preenchimento via popup...")
-
-        sinal_popup.popup_aberto = True
-        sinal_popup.event_loop = QEventLoop()
-        sinal_popup.resultado_popup = None
-        sinal_popup.abrir_popup_signal.emit(empresa_id, janela_pai)
-        sinal_popup.event_loop.exec()
-        sinal_popup.popup_aberto = False
-
-    else:
-        print("[INFO] Nenhuma alíquota nula encontrada.")
-
+        sinal_popup._popup_ativo = False
+        print("[INFO] Lock do popup liberado")
+    
 async def preencherTributacao(empresa_id, parent=None, lote_tamanho=3000):
     print(f"[VERIFICAÇÃO] Preenchendo cadastro_tributacao com produtos da empresa_id={empresa_id}")
     conexao = conectarBanco()
