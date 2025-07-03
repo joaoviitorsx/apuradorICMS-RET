@@ -39,7 +39,7 @@ class WorkerCarregarEmpresas(QtCore.QThread):
 class EmpresaWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Apurado de ICMS - Empresas')
+        self.setWindowTitle('Apurado de ICMS + RET - Empresas')
         self.setGeometry(200, 200, 900, 700)
         self.setStyleSheet('background-color: #030d18;')
 

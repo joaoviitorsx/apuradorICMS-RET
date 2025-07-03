@@ -9,7 +9,7 @@ class EmpresaCadastro(QtWidgets.QWidget):
     def __init__(self, nome_banco):
         super().__init__()
         self.nome_banco = nome_banco
-        self.setWindowTitle('Apurado de ICMS - Cadastro de Empresas')
+        self.setWindowTitle('Apurado de ICMS + RET - Cadastro de Empresas')
         self.setGeometry(200, 200, 900, 700)
         self.setStyleSheet('background-color: #030d18;')
 
