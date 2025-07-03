@@ -3,7 +3,7 @@ from ui.cadastroEmpresa import EmpresaCadastro
 from ui.telaPrincipal import MainWindow
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectarBanco, fecharBanco, iniciliazarBanco
+from db.conexao import conectarBanco, fecharBanco
 from utils.icone import resource_path
 
 # class WorkerInicializacao(QtCore.QThread):
