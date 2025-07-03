@@ -49,23 +49,23 @@ def iniciliazarBanco():
     from db.criarTabelas import criar_tabelas_principais, criar_tabela_empresas
 
     config = env()
-    conexao_mysql = conectarMySQL()
-    if not conexao_mysql:
+    conexaoMySQL = conectarMySQL()
+    if not conexaoMySQL:
         print("[FALHA] Não foi possível conectar ao MySQL.")
         return None
 
     try:
-        cursor = conexao_mysql.cursor()
+        cursor = conexaoMySQL.cursor()
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS {config['banco']}")
         print(f"[INFO] Banco '{config['banco']}' verificado/criado com sucesso.")
     except Error as e:
         print(f"[ERRO] ao criar banco '{config['banco']}': {e}")
     finally:
-        fecharBanco(conexao_mysql)
+        fecharBanco(conexaoMySQL)
 
-    conexao_final = conectarBanco()
-    if conexao_final:
-        criar_tabela_empresas(conexao_final)
+    conexaoFinal = conectarBanco()
+    if conexaoFinal:
+        criar_tabela_empresas(conexaoFinal)
         criar_tabelas_principais()
-        return conexao_final
+        return conexaoFinal
     return None
