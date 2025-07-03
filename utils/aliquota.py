@@ -1,4 +1,4 @@
-def formatar_aliquota(valor):
+def formatarAliquota(valor):
     try:
         if valor is None:
             return "0.00%"

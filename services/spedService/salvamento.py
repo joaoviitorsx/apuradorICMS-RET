@@ -21,8 +21,7 @@ async def salvarDados(conteudo, cursor, conexao, empresa_id, janela=None):
                 cursor.execute("SELECT COUNT(*) FROM c170 WHERE periodo = %s AND empresa_id = %s", 
                                (periodo, empresa_id))
                 count_c170 = cursor.fetchone()[0]
-                # INTERROMPE O PROCESSAMENTO AQUI
-                raise ValueError(f"SPED do período {periodo} já foi processado anteriormente. {count_c170} itens já existem no banco. Processamento interrompido para evitar duplicatas.")
+                raise ValueError(f"SPED do período {periodo} já foi processado anteriormente. {count_c170} itens já existem no banco.")
             break
     
     if dt_ini_0000 is None:

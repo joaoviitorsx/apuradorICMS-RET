@@ -2,7 +2,7 @@ import pandas as pd
 import unicodedata
 from PySide6.QtWidgets import QFileDialog
 from db.conexao import conectarBanco, fecharBanco
-from utils.aliquota import formatar_aliquota
+from utils.aliquota import formatarAliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
 from ui.popupAliquota import PopupAliquota
 
@@ -63,11 +63,11 @@ def enviar_tributacao(empresa_id, progress_bar):
         df = df.rename(columns=mapeamento)
 
         col_aliquota = mapeamento['ALIQUOTA']
-        df[col_aliquota] = df[col_aliquota].fillna('').astype(str).str.strip().apply(formatar_aliquota)
+        df[col_aliquota] = df[col_aliquota].fillna('').astype(str).str.strip().apply(formatarAliquota)
         
         col_aliquotaRT = mapeamento['RET']
         df[col_aliquotaRT] = df[col_aliquotaRT].fillna('').astype(str).str.strip()
-        df[col_aliquotaRT] = df[col_aliquotaRT].apply(lambda x: formatar_aliquota(x) if x.strip() else '')
+        df[col_aliquotaRT] = df[col_aliquotaRT].apply(lambda x: formatarAliquota(x) if x.strip() else '')
 
         df_inserir = df[[mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA'], mapeamento['RET']]].copy()
         df_inserir['empresa_id'] = empresa_id

@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableW
 from PySide6.QtCore import Qt
 from PySide6 import QtGui
 from utils.ret import preencherAliquotaRET
-from utils.aliquota import formatar_aliquota
+from utils.aliquota import formatarAliquota
 from db.conexao import conectarBanco, fecharBanco
 from utils.mensagem import mensagem_sucesso, mensagem_error
 
@@ -109,7 +109,7 @@ class PopupAliquota(QDialog):
                     print(f"[AVISO] Linha {row} possui dados incompletos. Pulando...")
                     continue
 
-                aliquota_formatada = formatar_aliquota(aliquota_bruta)
+                aliquota_formatada = formatarAliquota(aliquota_bruta)
 
                 print(f"[DEBUG] Produto: {produto}, NCM: {ncm}, Alíquota informada: {aliquota_formatada}")
 

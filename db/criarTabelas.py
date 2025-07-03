@@ -349,8 +349,9 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, 'c170_clone', 'idx_c170clone_empresa_produto_ncm_aliquota', 'empresa_id, descr_compl, ncm, aliquota')
         criar_indice_se_nao_existir(cursor,'cadastro_tributacao','uniq_empresa_codigo_produto_ncm','empresa_id, codigo, produto(255), ncm',unique=True)
         criar_indice_se_nao_existir(cursor, '0150', 'idx_0150_codpart_empresa', 'cod_part, empresa_id')
+        criar_indice_se_nao_existir(cursor, '0000', 'uniq_0000_periodo_empresa', 'periodo, empresa_id', unique=True)
+        criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_unico_c100_item', 'id_c100, num_item, cod_item')
 
-        
         cursor.execute("""
                 INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES
                 (12, 'AC', 'norte', 8.31, 4.16, 5.12, 19.84),
