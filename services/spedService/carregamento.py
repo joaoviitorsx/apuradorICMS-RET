@@ -19,13 +19,13 @@ class Mensageiro(QObject):
     sinal_sucesso = Signal(str)
     sinal_erro = Signal(str)
 
-def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
+def processarSpedThread(empresa_id, progress_bar, label_arquivo, caminhos, janela=None, mensageiro=None):
     print(f"[DEBUG] Iniciando thread de processamento SPED com {len(caminhos)} arquivo(s)")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     result, mensagem_final = loop.run_until_complete(
-        processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, janela)
+        processarSped(empresa_id, progress_bar, label_arquivo, caminhos, janela)
     )
 
     print(f"[DEBUG] Thread de processamento SPED finalizada")
@@ -40,7 +40,7 @@ def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, jan
 
     loop.close()
 
-def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=None):
+def iniciarProcessamentoSped(empresa_id, progress_bar, label_arquivo, janela=None):
     print(f"[DEBUG] Solicitando seleção de arquivos SPED...")
     caminhos, _ = QFileDialog.getOpenFileNames(None, "Inserir Speds", "", "Arquivos Sped (*.txt)")
     if not caminhos:
@@ -59,13 +59,13 @@ def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=N
         print(f"[DEBUG] {i+1}. {os.path.basename(caminho)} ({os.path.getsize(caminho)/1024:.1f} KB)")
 
     thread = threading.Thread(
-        target=processar_sped_thread,
+        target=processarSpedThread,
         args=(empresa_id, progress_bar, label_arquivo, caminhos, janela, mensageiro)
     )
     thread.start()
     print(f"[DEBUG] Thread de processamento SPED iniciada")
 
-async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, janela=None):
+async def processarSped(empresa_id, progress_bar, label_arquivo, caminhos, janela=None):
     print(f"[DEBUG] Iniciando processamento de {len(caminhos)} arquivo(s) SPED...")
 
     conexao_cheque = conectarBanco()

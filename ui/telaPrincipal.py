@@ -3,7 +3,7 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtWidgets import QMessageBox, QFileDialog, QApplication
 from utils.icone import usar_icone
 from services.tributacaoService import enviar_tributacao
-from services.spedService.carregamento import iniciar_processamento_sped
+from services.spedService.carregamento import iniciarProcessamentoSped
 from services.exportacaoService import ExportWorker
 from services.spedService import sinal_popup
 from ui.popupAliquota import PopupAliquota
@@ -138,7 +138,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _processar_sped(self):
         self.progress_bar.setValue(0)
-        iniciar_processamento_sped(self.empresa_id, self.progress_bar, self.label_arquivo, self)
+        iniciarProcessamentoSped(self.empresa_id, self.progress_bar, self.label_arquivo, self)
 
     def _criar_seletor_mes_ano(self):
         mes_frame = QtWidgets.QHBoxLayout()
