@@ -134,5 +134,5 @@ def sanitizar_campo(campo, valor):
 def sanitizar_registro(registro_dict):
     return {campo: sanitizar_campo(campo, valor) for campo, valor in registro_dict.items()}
 
-def calcularPeriodo(dt_ini_0000):
+def calcular_periodo(dt_ini_0000):
     return f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
