@@ -1,16 +1,17 @@
 import pandas as pd
 import unicodedata
 from PySide6.QtWidgets import QFileDialog
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.aliquota import formatar_aliquota
 from utils.mensagem import mensagem_aviso, mensagem_error, mensagem_sucesso
+from ui.popupAliquota import PopupAliquota
 
 COLUNAS_SINONIMAS = {
     'CODIGO': ['codigo', 'código', 'cod', 'cod_produto', 'id'],
     'PRODUTO': ['produto', 'descricao', 'descrição', 'nome', 'produto_nome'],
     'NCM': ['ncm', 'cod_ncm', 'ncm_code'],
     'ALIQUOTA': ['aliquota', 'alíquota', 'aliq', 'aliq_icms'],
-    'RET': ['ret', 'retencao', 'ret_icms', 'valor_ret', 'ret_icms_valor', 'rt']
+    'RET': ['ret', 'retencao', 'ret_icms', 'valor_ret', 'ret_icms_valor', 'rt', 'Ret']
 }
 
 def normalizar_texto(texto):
@@ -18,7 +19,6 @@ def normalizar_texto(texto):
 
 def mapear_colunas(df):
     colunas_encontradas = {}
-    colunas_atuais = [col.lower().strip() for col in df.columns]
 
     for coluna_padrao, sinonimos in COLUNAS_SINONIMAS.items():
         for nome in sinonimos:
@@ -37,7 +37,7 @@ def mapear_colunas(df):
     return None
 
 def enviar_tributacao(empresa_id, progress_bar):
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     progress_bar.setValue(0)
 
     filename, _ = QFileDialog.getOpenFileName(None, "Enviar Tributação", "", "Arquivos Excel (*.xlsx)")
@@ -54,20 +54,20 @@ def enviar_tributacao(empresa_id, progress_bar):
 
     try:
         df = pd.read_excel(filename, dtype=str)
+        
         mapeamento = mapear_colunas(df)
-
         if not mapeamento:
             mensagem_error("Não foi possível identificar as colunas necessárias na planilha.")
             return
-
-        print("[DEBUG] Colunas mapeadas:", mapeamento)
+        
         df = df.rename(columns=mapeamento)
 
         col_aliquota = mapeamento['ALIQUOTA']
         df[col_aliquota] = df[col_aliquota].fillna('').astype(str).str.strip().apply(formatar_aliquota)
-
+        
         col_aliquotaRT = mapeamento['RET']
-        df[col_aliquotaRT] = df[col_aliquotaRT].fillna('').astype(str).str.strip().apply(formatar_aliquota)
+        df[col_aliquotaRT] = df[col_aliquotaRT].fillna('').astype(str).str.strip()
+        df[col_aliquotaRT] = df[col_aliquotaRT].apply(lambda x: formatar_aliquota(x) if x.strip() else '')
 
         df_inserir = df[[mapeamento['CODIGO'], mapeamento['PRODUTO'], mapeamento['NCM'], mapeamento['ALIQUOTA'], mapeamento['RET']]].copy()
         df_inserir['empresa_id'] = empresa_id
@@ -85,16 +85,33 @@ def enviar_tributacao(empresa_id, progress_bar):
 
         novos_registros = []
         atualizacoes = []
+        
+        total_linhas = 0
+        linhas_com_ret = 0
 
         for _, linha in df_inserir.iterrows():
+            total_linhas += 1
             codigo = str(linha[mapeamento['CODIGO']]).strip()
             produto = str(linha[mapeamento['PRODUTO']]).strip()
             ncm = str(linha[mapeamento['NCM']]).strip()
             aliquota = str(linha[mapeamento['ALIQUOTA']]).strip()
             aliquotaRET = str(linha[mapeamento['RET']]).strip()
+            
+            if aliquotaRET:
+                linhas_com_ret += 1
+            
+            aliquota_upper = aliquota.upper()
+            if any(caso in aliquota_upper for caso in ['ST', 'ISENTO', 'PAUTA']):
+                aliquotaRET = aliquota
+            elif not aliquotaRET and aliquota:
+                try:
+                    valor = aliquota.upper().replace('%', '').replace(',', '.').strip()
+                    float(valor)
+                    aliquotaRET = aliquota
+                except ValueError:
+                    pass
 
             aliquota_str = aliquota.upper().replace('%', '').replace(',', '.').strip()
-
             if aliquota_str in ["ISENTO", "ST", "SUBSTITUICAO", "0", "0.00"]:
                 categoria = 'ST'
             else:
@@ -111,7 +128,6 @@ def enviar_tributacao(empresa_id, progress_bar):
                     else:
                         categoria = 'regraGeral'
                 except ValueError:
-                    print(f"[ERRO] Alíquota inválida na planilha: {aliquota_str} - Produto: {produto}")
                     categoria = 'regraGeral'
 
             chave = (codigo, produto, ncm)
@@ -122,12 +138,14 @@ def enviar_tributacao(empresa_id, progress_bar):
             elif aliquota_existente != aliquota or aliquotaRET_existente != aliquotaRET:
                 atualizacoes.append((aliquota, aliquotaRET, empresa_id, codigo, produto, ncm))
 
+        print(f"[INFO] Processando {total_linhas} produtos ({linhas_com_ret} com RET informado)")
+
         if novos_registros:
             cursor.executemany("""
                 INSERT INTO cadastro_tributacao (empresa_id, codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, novos_registros)
-            print(f"[DEBUG] {len(novos_registros)} novos registros inseridos.")
+            print(f"[INFO] {len(novos_registros)} novos produtos cadastrados")
 
         if atualizacoes:
             cursor.executemany("""
@@ -135,7 +153,21 @@ def enviar_tributacao(empresa_id, progress_bar):
                 SET aliquota = %s, aliquotaRET = %s
                 WHERE empresa_id = %s AND codigo = %s AND produto = %s AND ncm = %s
             """, atualizacoes)
-            print(f"[DEBUG] {len(atualizacoes)} registros atualizados.")
+            print(f"[INFO] {len(atualizacoes)} produtos atualizados")
+
+        cursor.execute("""
+            UPDATE cadastro_tributacao
+            SET aliquotaRET = aliquota
+            WHERE empresa_id = %s 
+            AND (aliquotaRET IS NULL OR aliquotaRET = '')
+            AND aliquota IS NOT NULL 
+            AND aliquota != ''
+            AND aliquota NOT IN ('ST', 'ISENTO', 'PAUTA')
+        """, (empresa_id,))
+        
+        rows_affected = cursor.rowcount
+        if rows_affected > 0:
+            print(f"[INFO] {rows_affected} produtos receberam RET igual à alíquota")
 
         cursor.execute("""
             UPDATE cadastro_tributacao 
@@ -153,17 +185,20 @@ def enviar_tributacao(empresa_id, progress_bar):
             WHERE empresa_id = %s
         """, (empresa_id,))
 
+        cursor.execute("""
+            SELECT COUNT(*) FROM cadastro_tributacao
+            WHERE empresa_id = %s AND aliquotaRET != ''
+        """, (empresa_id,))
+        count_ret = cursor.fetchone()[0]
+        print(f"[INFO] Total de produtos com RET preenchido: {count_ret}")
+
         conexao.commit()
         progress_bar.setValue(100)
         total = len(novos_registros) + len(atualizacoes)
         mensagem_sucesso(f"Tributação enviada com sucesso! Total: {total} registros.")
-        print(f"[DEBUG] Total final processado: {total}")
 
     except Exception as e:
         mensagem_error(f"Erro ao processar o arquivo: {str(e)}")
         conexao.rollback()
     finally:
         progress_bar.setValue(0)
-        cursor.close()
-        fechar_banco(conexao)
-
