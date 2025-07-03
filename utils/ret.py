@@ -1,9 +1,9 @@
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 
 def preencherAliquotaRET(empresa_id, lote_tamanho=5000):
     print("Atualizando categoria fiscal e aliquotaRET...")
 
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor()
 
     try:
@@ -121,7 +121,7 @@ def preencherAliquotaRET(empresa_id, lote_tamanho=5000):
         print(f"[ERRO] Erro ao atualizar: {e}")
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
 
 

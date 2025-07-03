@@ -5,12 +5,26 @@ TAMANHOS_MAXIMOS = {
     'cod_item': 60,
     'descr_item': 255,
     'descr_compl': 255,
-    'cod_nat': 10,
+    'cod_nat': 11,
     'cod_cta': 255,
     'cod_part': 60,
     'nome': 100,
 }
 
+def limpar_aliquota(valor):
+    if not valor:
+        return None
+    valor = str(valor).strip().replace('%', '').replace(',', '.')
+    try:
+        num = float(valor)
+        if num == 0:
+            return '0%'
+        return f"{num:.2f}%"
+    except ValueError:
+        valor_upper = valor.upper()
+        if valor_upper in ["ST", "ISENTO", "PAUTA"]:
+            return valor_upper
+        return None
     
 def truncar(valor, limite):
     if valor is None:
@@ -70,6 +84,7 @@ def corrigir_ind_mov(valor):
     
     valor_str = str(valor)
     if len(valor_str) > 1:
+        #print(f"[TRUNCAR] ind_mov: '{valor_str}' → '{valor_str[:1]}'")
         return valor_str[:1]
     
     return valor_str
@@ -101,6 +116,7 @@ def validar_estrutura_c170(dados):
         print(f"[ERRO] Falha ao validar C170: {e}")
         return False
 
+
 def sanitizar_campo(campo, valor):
     regras = {
         'cod_item': lambda v: truncar(v, 60),
@@ -114,7 +130,7 @@ def sanitizar_campo(campo, valor):
         'cod_mod': lambda v: str(v).zfill(2)[:2] if v is not None else '00',
         'cst_icms': corrigir_cst_icms,
         'cfop': corrigir_cfop,
-        'cod_nat': lambda v: truncar(v, 10),
+        'cod_nat': lambda v: truncar(v, 11),
         'cod_cta': lambda v: truncar(v, 255),
         'reg': lambda v: truncar(v, 4),
         'vl_item': lambda v: str(v).replace(',', '.') if isinstance(v, str) else v,
@@ -142,6 +158,3 @@ def sanitizar_registro(registro_dict):
 
 def calcular_periodo(dt_ini_0000):
     return f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
-
-
-
