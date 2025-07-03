@@ -1,8 +1,7 @@
-import time
 import xlsxwriter
 from PySide6.QtCore import QThread, Signal
 from utils.aliquota import formatar_aliquota
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 
 class ExportWorker(QThread):
     progress = Signal(int)
@@ -21,7 +20,7 @@ class ExportWorker(QThread):
             self.progress.emit(5)
             periodo = f"{int(self.mes):02d}/{self.ano}"
 
-            conexao = conectar_banco()
+            conexao = conectarBanco()
             if not conexao:
                 self.erro.emit("Não foi possível conectar ao banco de dados.")
                 return
@@ -84,7 +83,6 @@ class ExportWorker(QThread):
 
             self.progress.emit(60)
 
-            start_time = time.time()
             workbook = xlsxwriter.Workbook(self.caminho_arquivo)
             worksheet = workbook.add_worksheet()
 
@@ -119,8 +117,6 @@ class ExportWorker(QThread):
                     self.progress.emit(progresso)
 
             workbook.close()
-            tempo_total = time.time() - start_time
-            print(f"[INFO] Exportação concluída em {tempo_total:.2f} segundos")
             self.progress.emit(100)
             self.finished.emit(self.caminho_arquivo)
 
@@ -129,6 +125,6 @@ class ExportWorker(QThread):
         finally:
             try:
                 cursor.close()
-                fechar_banco(conexao)
+                fecharBanco(conexao)
             except:
                 pass
