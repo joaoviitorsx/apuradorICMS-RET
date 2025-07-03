@@ -130,7 +130,7 @@ class PopupAliquota(QDialog):
             preencherAliquotaRET(self.empresa_id)
 
             self.label.setText("Alíquotas atualizadas com sucesso.")
-            mensagem_sucesso("Dados salvos com sucesso!")
+            mensagem_sucesso("Dados preenchidos salvo com sucesso!")
             self.accept()
 
         except Exception as e:
