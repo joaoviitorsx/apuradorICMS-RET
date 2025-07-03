@@ -1,10 +1,10 @@
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.conversao import Conversor
 
-async def atualizar_aliquota(empresa_id, lote_tamanho=5000):
+async def atualizarAliquota(empresa_id, lote_tamanho=5000):
     print("[INÍCIO] Atualizando alíquotas em c170_clone por lotes...")
 
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor(dictionary=True)
 
     try:
@@ -52,12 +52,12 @@ async def atualizar_aliquota(empresa_id, lote_tamanho=5000):
 
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
-async def atualizar_aliquotaRET(empresa_id, lote_tamanho=5000):
+async def atualizarAliquotaRET(empresa_id, lote_tamanho=5000):
     print("[INÍCIO] Atualizando aliquotaRET na c170_clone a partir de cadastro_tributacao")
 
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor(dictionary=True)
 
     try:
@@ -108,16 +108,16 @@ async def atualizar_aliquotaRET(empresa_id, lote_tamanho=5000):
 
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
-async def atualizar_aliquota_simples(empresa_id, periodo):
+async def aliquotaSimples(empresa_id, periodo):
     print("[INÍCIO] Atualizando alíquotas Simples Nacional")
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor(dictionary=True)
 
     try:
         cursor.execute("""
-            SELECT c.id, c.aliquota, c.aliquotaRET
+            SELECT c.id, c.aliquota, c.aliquotaRET, c.descr_compl, c.cod_part
             FROM c170_clone c
             JOIN cadastro_fornecedores f 
                 ON f.cod_part = c.cod_part AND f.empresa_id = %s
@@ -126,36 +126,38 @@ async def atualizar_aliquota_simples(empresa_id, periodo):
         """, (empresa_id, periodo, empresa_id))
 
         registros = cursor.fetchall()
-        total = len(registros)
-
         atualizacoes = []
 
         for row in registros:
-            aliquota_str = str(row['aliquota']).strip().upper()
-            aliquotaRET_str = str(row['aliquotaRET']).strip().upper()
-            if aliquota_str in ['ST', 'ISENTO', 'PAUTA'] or aliquotaRET_str in ['ST', 'ISENTO', 'PAUTA']:
+            aliquota_str = str(row.get('aliquota') or '').strip().upper()
+            aliquotaRET_str = str(row.get('aliquotaRET') or '').strip().upper()
+            
+            if aliquota_str in ['ST', 'ISENTO', 'PAUTA', ''] or aliquotaRET_str in ['ST', 'ISENTO', 'PAUTA']:
                 continue
 
-            aliquota = Conversor(row['aliquota'])
-            aliquotaRET = Conversor(row['aliquotaRET'])
-            nova_aliquota = round(aliquota + 3, 2)
-            nova_aliquotaRET = round(aliquotaRET + 3, 2)
+            try:
+                aliquota = Conversor(row['aliquota'])
+                aliquotaRET = Conversor(row['aliquotaRET'] or aliquota)
+                
+                nova_aliquota = round(aliquota + 3, 2)
+                nova_aliquotaRET = round(aliquotaRET + 3, 2)
 
-            aliquota_str = f"{nova_aliquota:.2f}".replace('.', ',') + '%'
-            aliquotaRET_str = f"{nova_aliquotaRET:.2f}".replace('.', ',') + '%'
+                aliquota_str = f"{nova_aliquota:.2f}".replace('.', ',') + '%'
+                aliquotaRET_str = f"{nova_aliquotaRET:.2f}".replace('.', ',') + '%'
 
-            atualizacoes.append((aliquota_str, aliquotaRET_str, row['id']))
+                atualizacoes.append((aliquota_str, aliquotaRET_str, row['id']))
+                
+            except Exception as e:
+                print(f"[AVISO] Erro ao processar registro {row['id']}: {e}")
 
         if atualizacoes:
             cursor.executemany("""
                 UPDATE c170_clone
-                SET aliquota = %s,
-                SET aliquotaRET = %s
+                SET aliquota = %s, aliquotaRET = %s
                 WHERE id = %s
             """, atualizacoes)
 
             conexao.commit()
-            print(f"[OK] {total} alíquotas do Simples atualizadas.")
 
     except Exception as e:
         print(f"[ERRO] ao atualizar alíquota Simples: {e}")
@@ -163,12 +165,12 @@ async def atualizar_aliquota_simples(empresa_id, periodo):
 
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
         print("[FIM] Finalização da atualização de alíquota Simples.")
 
-async def atualizar_resultado(empresa_id):
+async def atualizarResultado(empresa_id):
     print("[INÍCIO] Atualizando resultado")
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor(dictionary=True)
 
     try:
@@ -195,8 +197,7 @@ async def atualizar_resultado(empresa_id):
         if atualizacoes:
             cursor.executemany("""
                 UPDATE c170_clone
-                SET aliquota = %s,
-                    aliquotaRET = %s
+                SET resultado = %s
                 WHERE id = %s
             """, atualizacoes)
 
@@ -209,12 +210,12 @@ async def atualizar_resultado(empresa_id):
 
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
         print("[FIM] Finalização da atualização de resultado.")
 
-async def atualizar_resultadoRET(empresa_id):
+async def atualizarResultadoRET(empresa_id):
     print("[INÍCIO] Atualizando resultadoRET")
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor(dictionary=True)
 
     try:
@@ -254,11 +255,11 @@ async def atualizar_resultadoRET(empresa_id):
 
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
         print("[FIM] Finalização da atualização de resultadoRET.")
 
-async def corrigir_aliquota_decreto(empresa_id):
-    conexao = conectar_banco()
+async def aplicarDecreto(empresa_id):
+    conexao = conectarBanco()
     cursor = conexao.cursor()
 
     print(f"[INÍCIO] Correção de alíquotas com base na tabela decreto para empresa_id={empresa_id}...")
@@ -344,7 +345,7 @@ async def corrigir_aliquota_decreto(empresa_id):
         print(f"[ERRO] Durante execução da função de correção: {e}")
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
 
 

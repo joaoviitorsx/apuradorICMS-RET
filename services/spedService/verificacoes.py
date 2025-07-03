@@ -1,5 +1,5 @@
 from PySide6.QtCore import QObject, Signal, QEventLoop
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 
 class SinalPopup(QObject):
     abrir_popup_signal = Signal(int, object)
@@ -11,10 +11,10 @@ class SinalPopup(QObject):
 
 sinal_popup = SinalPopup()
 
-async def verificar_e_abrir_popup_aliquota(empresa_id, janela_pai=None):
+async def verificaoPopupAliquota(empresa_id, janela_pai=None):
     print(f"[INFO] Verificando alíquotas nulas para empresa_id={empresa_id}...")
 
-    conexao = conectar_banco()
+    conexao = conectarBanco()
     cursor = conexao.cursor()
 
     try:
@@ -29,7 +29,7 @@ async def verificar_e_abrir_popup_aliquota(empresa_id, janela_pai=None):
         count = cursor.fetchone()[0]
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
     print("[INFO] Conexão com banco encerrada.")
 
@@ -46,8 +46,8 @@ async def verificar_e_abrir_popup_aliquota(empresa_id, janela_pai=None):
 
 
 async def preencherTributacao(empresa_id, parent=None):
-    print(f"[VERIFICAÇÃO] Preenchendo cadastro_tributacao com produtos distintos (descrição + NCM) da empresa_id={empresa_id}...")
-    conexao = conectar_banco()
+    print(f"[VERIFICAÇÃO] Preenchendo cadastro_tributacao com produtos da empresa_id={empresa_id}")
+    conexao = conectarBanco()
     cursor = conexao.cursor()
 
     try:
@@ -107,7 +107,7 @@ async def preencherTributacao(empresa_id, parent=None):
 
     finally:
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
         print("[FIM] Preenchimento de cadastro_tributacao concluído.")
 
 

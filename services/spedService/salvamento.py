@@ -4,7 +4,7 @@ from utils.sanitizacao import truncar, corrigir_unidade, corrigir_ind_mov, corri
 
 UNIDADE_PADRAO = "UN"
 
-async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=None):
+async def salvarDados(conteudo, cursor, conexao, empresa_id, janela=None):
     linhas = conteudo 
     print(f"[DEBUG] Iniciando processamento de {len(linhas)} linhas")
 
@@ -232,8 +232,8 @@ async def salvar_no_banco_em_lote(conteudo, cursor, conexao, empresa_id, janela=
                      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, lote_c100, "|C100|")
 
-        for i in range(0, len(lote_c170), 100):
-            lote = lote_c170[i:i+100]
+        for i in range(0, len(lote_c170), 5000):
+            lote = lote_c170[i:i+5000]
             #print(f"[DEBUG] Tentando inserir lote C170 {i}-{i+len(lote)}, primeiro registro: {lote[0][:5]}...")
             try:
                 cursor.executemany("""

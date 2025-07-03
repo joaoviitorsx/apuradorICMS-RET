@@ -1,9 +1,9 @@
 from .carregamento import processar_sped
-from .salvamento import salvar_no_banco_em_lote
+from .salvamento import salvarDados
 from .pos_processamento import etapas_pos_processamento
-from .tributacao import criar_e_preencher_c170nova
-from .atualizacoes import atualizar_aliquota, atualizar_aliquota_simples, atualizar_resultado, atualizar_aliquotaRET,atualizar_resultadoRET, corrigir_aliquota_decreto
-from .verificacoes import verificar_e_abrir_popup_aliquota, preencherTributacao, sinal_popup
+from .tributacao import criarC170nova
+from .atualizacoes import atualizarAliquota, aliquotaSimples, atualizarResultado, atualizarAliquotaRET,atualizarResultadoRET, aplicarDecreto
+from .verificacoes import verificaoPopupAliquota, preencherTributacao, sinal_popup
 
 
 

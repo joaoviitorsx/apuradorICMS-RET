@@ -5,10 +5,10 @@ import math
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtCore import QObject, Signal
 
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.processData import process_data
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
-from .salvamento import salvar_no_banco_em_lote
+from .salvamento import salvarDados
 from .pos_processamento import etapas_pos_processamento
 from services.fornecedorService import mensageiro as mensageiro_fornecedor
 from services.spedService.limpeza import limpar_tabelas_temporarias
@@ -42,7 +42,7 @@ def processar_sped_thread(empresa_id, progress_bar, label_arquivo, caminhos, jan
 
 def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=None):
     print(f"[DEBUG] Solicitando seleção de arquivos SPED...")
-    caminhos, _ = QFileDialog.getOpenFileNames(None, "Inserir Sped", "", "Arquivos Sped (*.txt)")
+    caminhos, _ = QFileDialog.getOpenFileNames(None, "Inserir Speds", "", "Arquivos Sped (*.txt)")
     if not caminhos:
         mensagem_aviso("Nenhum arquivo selecionado.", parent=janela)
         print(f"[DEBUG] Nenhum arquivo selecionado.")
@@ -68,7 +68,7 @@ def iniciar_processamento_sped(empresa_id, progress_bar, label_arquivo, janela=N
 async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, janela=None):
     print(f"[DEBUG] Iniciando processamento de {len(caminhos)} arquivo(s) SPED...")
 
-    conexao_cheque = conectar_banco()
+    conexao_cheque = conectarBanco()
     if not conexao_cheque:
         return False, "Erro ao conectar ao banco"
 
@@ -76,10 +76,10 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
     cursor_cheque.execute("SHOW TABLES LIKE 'cadastro_tributacao'")
     if not cursor_cheque.fetchone():
         cursor_cheque.close()
-        fechar_banco(conexao_cheque)
+        fecharBanco(conexao_cheque)
         return False, "Tributação não encontrada. Envie primeiro a tributação."
     cursor_cheque.close()
-    fechar_banco(conexao_cheque)
+    fecharBanco(conexao_cheque)
 
     total = len(caminhos)
     progresso_por_arquivo = math.ceil(100 / total) if total > 0 else 100
@@ -113,15 +113,15 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
             progress_bar.setValue(progresso_atual)
             await asyncio.sleep(0.1)
 
-        conexao = conectar_banco()
+        conexao = conectarBanco()
         cursor = conexao.cursor()
 
-        limpar_tabelas_temporarias(empresa_id)
+        #limpar_tabelas_temporarias(empresa_id)
 
-        mensagem = await salvar_no_banco_em_lote(dados_gerais, cursor, conexao, empresa_id)
+        mensagem = await salvarDados(dados_gerais, cursor, conexao, empresa_id)
         conexao.commit()
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
         if isinstance(mensagem, str) and not mensagem.lower().startswith(("falha", "erro")):
             await etapas_pos_processamento(empresa_id, progress_bar, janela_pai=janela)
@@ -136,7 +136,7 @@ async def processar_sped(empresa_id, progress_bar, label_arquivo, caminhos, jane
 
     finally:
         try:
-            fechar_banco(conexao)
+            fecharBanco(conexao)
         except:
             pass
         await asyncio.sleep(0.5)
