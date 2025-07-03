@@ -1,17 +1,24 @@
+import os
 import mysql.connector
 from mysql.connector import Error
+from dotenv import load_dotenv
 
-HOST = 'localhost'
-USUARIO = 'root'
-SENHA = '12345'
-BANCO = 'empresasRT_db'
+def env():
+    load_dotenv()
+    return {
+        'host': os.getenv('HOST'),
+        'usuario': os.getenv('USUARIO'),
+        'senha': os.getenv('SENHA'),
+        'banco': os.getenv('BANCO')
+    }
 
-def conectar_mysql():
+def conectarMySQL():
     try:
+        config = env()
         conexao = mysql.connector.connect(
-            host=HOST,
-            user=USUARIO,
-            password=SENHA
+            host=config['host'],
+            user=config['usuario'],
+            password=config['senha']
         )
         if conexao.is_connected():
             return conexao
@@ -19,59 +26,46 @@ def conectar_mysql():
         print(f"[ERRO] ao conectar ao MySQL: {e}")
     return None
 
-def conectar_banco():
+def conectarBanco():
     try:
+        config = env()
         conexao = mysql.connector.connect(
-            host=HOST,
-            user=USUARIO,
-            password=SENHA,
-            database=BANCO
+            host=config['host'],
+            user=config['usuario'],
+            password=config['senha'],
+            database=config['banco']
         )
         if conexao.is_connected():
             return conexao
     except Error as e:
-        print(f"[ERRO] ao conectar ao banco de dados '{BANCO}': {e}")
+        print(f"[ERRO] ao conectar ao banco de dados '{config['banco']}': {e}")
     return None
 
-def fechar_banco(conexao):
+def fecharBanco(conexao):
     if conexao and conexao.is_connected():
         conexao.close()
 
-def inicializar_banco():
-    from db.criarTabelas import criar_tabelas_principais
+def iniciliazarBanco():
+    from db.criarTabelas import criar_tabelas_principais, criar_tabela_empresas
 
-    conexao_mysql = conectar_mysql()
+    config = env()
+    conexao_mysql = conectarMySQL()
     if not conexao_mysql:
         print("[FALHA] Não foi possível conectar ao MySQL.")
         return None
 
     try:
         cursor = conexao_mysql.cursor()
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {BANCO}")
-        print(f"[INFO] Banco '{BANCO}' verificado/criado com sucesso.")
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {config['banco']}")
+        print(f"[INFO] Banco '{config['banco']}' verificado/criado com sucesso.")
     except Error as e:
-        print(f"[ERRO] ao criar banco '{BANCO}': {e}")
+        print(f"[ERRO] ao criar banco '{config['banco']}': {e}")
     finally:
-        fechar_banco(conexao_mysql)
+        fecharBanco(conexao_mysql)
 
-    conexao_final = conectar_banco()
+    conexao_final = conectarBanco()
     if conexao_final:
         criar_tabela_empresas(conexao_final)
-        criar_tabelas_principais() 
+        criar_tabelas_principais()
         return conexao_final
     return None
-
-def criar_tabela_empresas(conexao):
-    try:
-        cursor = conexao.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS empresas (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                cnpj VARCHAR(20),
-                razao_social VARCHAR(100)
-            )
-        """)
-        conexao.commit()
-        print("[INFO] Tabela 'empresas' criada/verificada com sucesso.")
-    except Error as e:
-        print(f"[ERRO] ao criar tabela 'empresas': {e}")
