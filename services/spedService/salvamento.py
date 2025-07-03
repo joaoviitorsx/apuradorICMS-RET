@@ -1,5 +1,5 @@
 import traceback
-from utils.siglas import obter_sigla_estado
+from utils.siglas import obterUF
 from utils.sanitizacao import truncar, corrigirUnidade, corrigir_ind_mov, corrigir_cst_icms, TAMANHOS_MAXIMOS, calcular_periodo, validar_estrutura_c170
 
 UNIDADE_PADRAO = "UN"
@@ -102,7 +102,7 @@ async def salvarDados(conteudo, cursor, conexao, empresa_id, janela=None):
                 partes += [None] * (13 - len(partes))
                 municipio = partes[7]
                 cod_uf = municipio[:2] if municipio else None
-                uf = obter_sigla_estado(cod_uf)
+                uf = obterUF(cod_uf)
                 pj_pf = "PF" if partes[4] is None else "PJ"
                 periodo = calcular_periodo(dt_ini_0000)
                 cod_part = partes[1]
