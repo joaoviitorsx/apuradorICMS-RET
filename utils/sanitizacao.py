@@ -30,11 +30,9 @@ def truncar(valor, limite):
     if valor is None:
         return None
     valor_str = str(valor)
-    if len(valor_str) > limite:
-        print(f"[TRUNCAR] Valor '{valor_str}' excede {limite} chars → '{valor_str[:limite]}'")
     return valor_str[:limite]
 
-def corrigir_unidade(valor):
+def corrigirUnidade(valor):
     if not valor:
         return 'UN'
         
@@ -81,39 +79,22 @@ def corrigir_cfop(valor):
 def corrigir_ind_mov(valor):
     if not valor:
         return '0'
-    
     valor_str = str(valor)
     if len(valor_str) > 1:
-        #print(f"[TRUNCAR] ind_mov: '{valor_str}' → '{valor_str[:1]}'")
         return valor_str[:1]
-    
     return valor_str
 
 def validar_estrutura_c170(dados):
     try:
         if not dados or len(dados) < 45:
-            print(f"[DEBUG] C170 com estrutura insuficiente: {len(dados) if dados else 0} campos (esperado: 45 campos)")
             return False
-        
-        periodo = dados[0]    
-        filial = dados[41]    
-        num_doc = dados[43]   
-
-        if not periodo:
-            print("[DEBUG CRÍTICO] Periodo faltando.")
-        if not filial:
-            print("[DEBUG CRÍTICO] Filial faltando.")
-        if not num_doc:
-            print("[DEBUG CRÍTICO] Num_doc faltando.")
-
+        periodo = dados[0]
+        filial = dados[41]
+        num_doc = dados[43]
         if not (periodo and filial and num_doc):
-            print(f"[DEBUG] C170 sem campos obrigatórios: periodo={periodo}, filial={filial}, num_doc={num_doc}")
             return False
-        
         return True
-        
-    except Exception as e:
-        print(f"[ERRO] Falha ao validar C170: {e}")
+    except Exception:
         return False
 
 
@@ -122,8 +103,8 @@ def sanitizar_campo(campo, valor):
         'cod_item': lambda v: truncar(v, 60),
         'descr_item': lambda v: truncar(v, 255),
         'descr_compl': lambda v: truncar(v, 255),
-        'unid_inv': corrigir_unidade,
-        'unid': corrigir_unidade,
+        'unid_inv': corrigirUnidade,
+        'unid': corrigirUnidade,
         'cod_part': lambda v: truncar(v, 60),
         'nome': lambda v: truncar(v, 100),
         'ind_mov': corrigir_ind_mov,
@@ -145,16 +126,13 @@ def sanitizar_campo(campo, valor):
     try:
         if campo in regras:
             novo_valor = regras[campo](valor)
-            if novo_valor != valor:
-                print(f"[SANITIZAR] {campo}: '{valor}' → '{novo_valor}'")
             return novo_valor
         return valor
-    except Exception as e:
-        print(f"[ERRO] sanitizar_campo({campo}) → {e}")
+    except Exception:
         return valor
 
 def sanitizar_registro(registro_dict):
     return {campo: sanitizar_campo(campo, valor) for campo, valor in registro_dict.items()}
 
-def calcular_periodo(dt_ini_0000):
+def calcularPeriodo(dt_ini_0000):
     return f'{dt_ini_0000[2:4]}/{dt_ini_0000[4:]}' if dt_ini_0000 else '00/0000'
