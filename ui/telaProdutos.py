@@ -1,6 +1,6 @@
 from PySide6 import QtWidgets, QtGui, QtCore
 from unidecode import unidecode
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.mensagem import mensagem_aviso, mensagem_sucesso, mensagem_error
 
 class TelaProduto(QtWidgets.QWidget):
@@ -74,7 +74,7 @@ class TelaProduto(QtWidgets.QWidget):
 
     def carregar_dados(self):
         self.tabela.setRowCount(0)
-        conexao = conectar_banco()
+        conexao = conectarBanco()
         cursor = conexao.cursor()
         try:
             cursor.execute("SELECT codigo, produto, ncm, aliquota, aliquotaRET, categoria_fiscal FROM cadastro_tributacao WHERE empresa_id = %s", (self.empresa_id,))
@@ -91,7 +91,7 @@ class TelaProduto(QtWidgets.QWidget):
             mensagem_error(f"Erro ao carregar dados: {e}")
         finally:
             cursor.close()
-            fechar_banco(conexao)
+            fecharBanco(conexao)
 
     def filtrar_tabela(self):
         termo = self.search_input.text().lower()
@@ -124,7 +124,7 @@ class TelaProduto(QtWidgets.QWidget):
         produto = self.tabela.item(linha, 1).text()
         confirmacao = QtWidgets.QMessageBox.question(self, "Confirmar Exclusão", f"Deseja excluir o produto '{produto}' (código: {codigo})?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if confirmacao == QtWidgets.QMessageBox.Yes:
-            conexao = conectar_banco()
+            conexao = conectarBanco()
             cursor = conexao.cursor()
             try:
                 cursor.execute("DELETE FROM cadastro_tributacao WHERE empresa_id = %s AND codigo = %s", (self.empresa_id, codigo))
@@ -136,7 +136,7 @@ class TelaProduto(QtWidgets.QWidget):
                 conexao.rollback()
             finally:
                 cursor.close()
-                fechar_banco(conexao)
+                fecharBanco(conexao)
 
     def _abrir_dialogo_edicao(self, modo, dados=None, dados_originais=None):
         dialogo = QtWidgets.QDialog(self)
@@ -171,7 +171,7 @@ class TelaProduto(QtWidgets.QWidget):
 
         campos = {}
         labels = ['Código', 'Produto', 'NCM', 'Alíquota', 'Alíquota RET', 'Categoria Fiscal']
-        placeholders = ['Ex: 12345', 'Nome do produto', 'Ex: 1234.56.78', 'Ex: 18.00', 'Ex: 4.00', '']
+        placeholders = ['Ex: 12345', 'Nome do produto', 'Ex: 12345678', 'Ex: 12.00', 'Ex: 4.00', '']
 
         for i, label in enumerate(labels):
             chave = unidecode(label.lower().replace(' ', '_'))
@@ -249,7 +249,7 @@ class TelaProduto(QtWidgets.QWidget):
             else:
                 dados[campo] = valor
 
-        conexao = conectar_banco()
+        conexao = conectarBanco()
         cursor = conexao.cursor()
 
         try:
@@ -306,4 +306,4 @@ class TelaProduto(QtWidgets.QWidget):
             conexao.rollback()
         finally:
             cursor.close()
-            fechar_banco(conexao)
+            fecharBanco(conexao)

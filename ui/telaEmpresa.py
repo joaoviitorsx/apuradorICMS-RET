@@ -3,7 +3,7 @@ from ui.cadastroEmpresa import EmpresaCadastro
 from ui.telaPrincipal import MainWindow
 from utils.mensagem import mensagem_error, mensagem_aviso, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectar_banco, fechar_banco, inicializar_banco
+from db.conexao import conectarBanco, fecharBanco, iniciliazarBanco
 from utils.icone import resource_path
 
 class WorkerInicializacao(QtCore.QThread):
@@ -12,10 +12,10 @@ class WorkerInicializacao(QtCore.QThread):
 
     def run(self):
         try:
-            conexao = inicializar_banco()
+            conexao = iniciliazarBanco()
             if conexao:
                 print("[DEBUG] Banco e tabelas garantidos com sucesso!")
-                fechar_banco(conexao)
+                fecharBanco(conexao)
             self.terminado.emit()
         except Exception as e:
             self.erro.emit(str(e))
@@ -26,12 +26,12 @@ class WorkerCarregarEmpresas(QtCore.QThread):
 
     def run(self):
         try:
-            conexao = conectar_banco()
+            conexao = conectarBanco()
             cursor = conexao.cursor()
             cursor.execute("SELECT razao_social FROM empresas ORDER BY razao_social ASC")
             empresas = [row[0] for row in cursor.fetchall()]
             cursor.close()
-            fechar_banco(conexao)
+            fecharBanco(conexao)
             self.empresas_carregadas.emit(empresas)
         except Exception as e:
             self.erro.emit(str(e))
@@ -149,12 +149,12 @@ class EmpresaWindow(QtWidgets.QWidget):
             return
 
         try:
-            conexao = conectar_banco()
+            conexao = conectarBanco()
             cursor = conexao.cursor()
             cursor.execute("SELECT id FROM empresas WHERE razao_social = %s", (nome_empresa,))
             resultado = cursor.fetchone()
             cursor.close()
-            fechar_banco(conexao)
+            fecharBanco(conexao)
 
             if not resultado:
                 mensagem_error("Empresa não encontrada na base de dados.")

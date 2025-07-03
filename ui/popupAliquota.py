@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6 import QtGui
 from utils.ret import preencherAliquotaRET
 from utils.aliquota import formatar_aliquota
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.mensagem import mensagem_sucesso, mensagem_error
 
 class PopupAliquota(QDialog):
@@ -59,7 +59,7 @@ class PopupAliquota(QDialog):
         self.carregar_dados()
 
     def carregar_dados(self):
-        conexao = conectar_banco()
+        conexao = conectarBanco()
         cursor = conexao.cursor()
 
         cursor.execute("""
@@ -76,7 +76,7 @@ class PopupAliquota(QDialog):
 
         dados = cursor.fetchall()
         cursor.close()
-        fechar_banco(conexao)
+        fecharBanco(conexao)
 
         self.tabela.setRowCount(len(dados))
         self.tabela.setColumnCount(5)
@@ -96,7 +96,7 @@ class PopupAliquota(QDialog):
 
     def salvar_dados(self):
         print("[SALVAR] Iniciando atualização de alíquotas")
-        conexao = conectar_banco()
+        conexao = conectarBanco()
         cursor = conexao.cursor()
 
         try:
@@ -141,7 +141,7 @@ class PopupAliquota(QDialog):
 
         finally:
             cursor.close()
-            fechar_banco(conexao)
+            fecharBanco(conexao)
 
     def exportar_planilha_modelo(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Planilha Modelo", "Tributacao.xlsx", "Arquivos Excel (*.xlsx)")

@@ -2,7 +2,7 @@ import re
 from PySide6 import QtWidgets, QtCore, QtGui
 from utils.mensagem import mensagem_error, mensagem_sucesso
 from utils.icone import usar_icone
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.cnpj import consultar_cnpj_api
 
 class EmpresaCadastro(QtWidgets.QWidget):
@@ -146,19 +146,19 @@ class CadastroEmpresaWorker(QtCore.QThread):
 
     def run(self):
         try:
-            conexao = conectar_banco()
+            conexao = conectarBanco()
             cursor = conexao.cursor()
 
             cursor.execute("SELECT id FROM empresas WHERE cnpj = %s", (self.cnpj,))
             if cursor.fetchone():
                 self.erro_ocorrido.emit("Empresa já cadastrada com este CNPJ.")
-                fechar_banco(conexao)
+                fecharBanco(conexao)
                 return
 
             cursor.execute("INSERT INTO empresas (cnpj, razao_social) VALUES (%s, %s)", (self.cnpj, self.razao))
             conexao.commit()
             cursor.close()
-            fechar_banco(conexao)
+            fecharBanco(conexao)
             self.cadastro_finalizado.emit("Empresa cadastrada com sucesso.")
         except Exception as e:
             self.erro_ocorrido.emit(str(e))

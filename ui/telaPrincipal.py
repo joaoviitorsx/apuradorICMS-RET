@@ -7,7 +7,7 @@ from services.spedService.carregamento import iniciar_processamento_sped
 from services.exportacaoService import ExportWorker
 from services.spedService import sinal_popup
 from ui.popupAliquota import PopupAliquota
-from db.conexao import conectar_banco, fechar_banco
+from db.conexao import conectarBanco, fecharBanco
 from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from utils.icone import resource_path
 
@@ -181,7 +181,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mensagem_aviso("Selecione um mês e um ano válidos.")
             return
 
-        conexao = conectar_banco()
+        conexao = conectarBanco()
 
         cursor = conexao.cursor()
         periodo = f"{mes.zfill(2)}/{ano}"
@@ -193,7 +193,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if total == 0:
             mensagem_aviso(f"Não há registros para o período {mes}/{ano}.")
-            fechar_banco(conexao)
+            fecharBanco(conexao)
             return
 
         if not conexao:
@@ -206,7 +206,7 @@ class MainWindow(QtWidgets.QMainWindow):
             resultado = cursor.fetchone()
             nome_empresa = resultado[0] if resultado else "empresa"
         finally:
-            fechar_banco(conexao)
+            fecharBanco(conexao)
 
         sugestao_nome = f"{ano}-{mes}-{nome_empresa}.xlsx"
 
