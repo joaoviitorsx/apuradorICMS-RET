@@ -26,7 +26,7 @@ def criarC170nova(empresa_id, lote_tamanho=3000):
 
         print("[parte 3] iniciando processamento em lotes")
         while True:
-            print(f"[LOTE] OFFSET {offset} - {offset + lote_tamanho}")
+            print(f"[LOTE]{offset} - {offset + lote_tamanho}")
 
             cursor.execute("""
                 SELECT 
