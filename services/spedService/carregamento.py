@@ -11,7 +11,6 @@ from utils.mensagem import mensagem_sucesso, mensagem_error, mensagem_aviso
 from .salvamento import salvarDados
 from .pos_processamento import etapas_pos_processamento
 from services.fornecedorService import mensageiro as mensageiro_fornecedor
-from services.spedService.limpeza import limpar_tabelas_temporarias
 
 sem_limite = asyncio.Semaphore(3)
 
@@ -115,8 +114,6 @@ async def processarSped(empresa_id, progress_bar, label_arquivo, caminhos, janel
 
         conexao = conectarBanco()
         cursor = conexao.cursor()
-
-        #limpar_tabelas_temporarias(empresa_id)
 
         mensagem = await salvarDados(dados_gerais, cursor, conexao, empresa_id)
         conexao.commit()

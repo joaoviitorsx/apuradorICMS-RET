@@ -46,7 +46,7 @@ class EmpresaWindow(QtWidgets.QWidget):
         self.banco_empresas = 'empresas_db'
 
         self._setup_layout()
-        # self._iniciar_verificacao_banco()
+        #self._iniciar_verificacao_banco()
 
         self._carregar_empresas()
 

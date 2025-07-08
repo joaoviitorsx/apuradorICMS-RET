@@ -9,7 +9,6 @@ def criarC170nova(empresa_id, lote_tamanho=3000):
     offset = 0
 
     try:
-        #carregar dados auxiliares em memoria
         print("[parte 1] carregando dados do fornecedores")
         cursor.execute("""
             SELECT cod_part, empresa_id, uf, decreto FROM cadastro_fornecedores

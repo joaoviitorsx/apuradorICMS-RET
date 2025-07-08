@@ -66,6 +66,7 @@ def criar_tabelas_principais():
                 ind_ativ VARCHAR(10),
                 filial VARCHAR(10),
                 periodo VARCHAR(10),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -91,6 +92,7 @@ def criar_tabelas_principais():
                 uf VARCHAR(5),
                 pj_pf VARCHAR(5),
                 periodo VARCHAR(10),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -113,6 +115,7 @@ def criar_tabelas_principais():
                 aliq_icms VARCHAR(10),
                 cest VARCHAR(10),
                 periodo VARCHAR(10),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -152,6 +155,7 @@ def criar_tabelas_principais():
                 vl_pis_st VARCHAR(20),
                 vl_cofins_st VARCHAR(20),
                 filial VARCHAR(10),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -209,6 +213,7 @@ def criar_tabelas_principais():
                 mercado VARCHAR(15) DEFAULT '',
                 aliquota VARCHAR(10) DEFAULT '',
                 resultado VARCHAR(20),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -270,6 +275,7 @@ def criar_tabelas_principais():
                 aliquotaRET VARCHAR(10),
                 resultado DECIMAL(15,2),
                 resultadoRET DECIMAL(15,2),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             );
         """)
@@ -297,6 +303,7 @@ def criar_tabelas_principais():
                 cod_part VARCHAR(60),
                 num_doc VARCHAR(20),
                 chv_nfe VARCHAR(60),
+                ativo BOOLEAN DEFAULT TRUE,
                 INDEX idx_empresa (empresa_id)
             )
         """)
@@ -322,6 +329,18 @@ def criar_tabelas_principais():
                 cesta_basica_7 FLOAT,
                 cesta_basica_12 FLOAT,
                 bebida_alcoolica FLOAT
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS speds_backup (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                tabela_origem VARCHAR(50) NOT NULL,
+                dados JSON NOT NULL,
+                periodo VARCHAR(10) NOT NULL,
+                empresa_id INT NOT NULL,
+                origem_arquivo VARCHAR(255) DEFAULT 'reprocessamento via interface',
+                data_backup TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
 
@@ -351,6 +370,14 @@ def criar_tabelas_principais():
         criar_indice_se_nao_existir(cursor, '0150', 'idx_0150_codpart_empresa', 'cod_part, empresa_id')
         criar_indice_se_nao_existir(cursor, '0000', 'uniq_0000_periodo_empresa', 'periodo, empresa_id', unique=True)
         criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_unico_c100_item', 'id_c100, num_item, cod_item')
+        criar_indice_se_nao_existir(cursor, 'speds_backup', 'idx_speds_backup_periodo', 'periodo')
+        criar_indice_se_nao_existir(cursor, 'speds_backup', 'idx_speds_backup_empresa', 'empresa_id')
+        criar_indice_se_nao_existir(cursor, 'speds_backup', 'idx_speds_backup_tabela', 'tabela_origem')
+        criar_indice_se_nao_existir(cursor, 'c170', 'idx_c170_empresa_cfop_ativo', 'empresa_id, cfop, ativo')  
+        criar_indice_se_nao_existir(cursor, 'c100', 'idx_c100_id_ativo', 'id, ativo')
+        criar_indice_se_nao_existir(cursor, 'c170nova', 'idx_c170nova_empresa_ativo', 'empresa_id, ativo')
+        criar_indice_se_nao_existir(cursor, '0200', 'idx_0200_empresa_ativo', 'empresa_id, ativo')
+        criar_indice_se_nao_existir(cursor, '0150', 'idx_0150_empresa_ativo', 'empresa_id, ativo')
 
         cursor.execute("""
                 INSERT INTO cadastroAliquotaTermo (codigo, uf, regiao, regra_geral, cesta_basica_7, cesta_basica_12, bebida_alcoolica) VALUES

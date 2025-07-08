@@ -57,6 +57,25 @@ class PopupAliquota(QDialog):
         layout.addWidget(self.botao_salvar, alignment=Qt.AlignCenter)
 
         self.carregar_dados()
+        self.tabela.itemChanged.connect(self.validarAliquota)
+
+    def validarAliquota(self, item):
+        if item.column() == 4:
+            row = item.row()
+            aliquota_text = item.text().strip()
+            
+            if aliquota_text:
+                # Remove destaque se preenchido
+                for col in range(self.tabela.columnCount()):
+                    cell_item = self.tabela.item(row, col)
+                    if cell_item:
+                        cell_item.setBackground(QtGui.QColor(255, 255, 255))
+            else:
+                # Destaca se vazio
+                for col in range(self.tabela.columnCount()):
+                    cell_item = self.tabela.item(row, col)
+                    if cell_item:
+                        cell_item.setBackground(QtGui.QColor(255, 200, 200))
 
     def carregar_dados(self):
         conexao = conectarBanco()
@@ -95,6 +114,36 @@ class PopupAliquota(QDialog):
         self.tabela.resizeColumnsToContents()
 
     def salvar_dados(self):
+        print("[SALVAR] Iniciando verificação de alíquotas")
+        
+        linhas_pendentes = []
+        for row in range(self.tabela.rowCount()):
+            produto = self.tabela.item(row, 2).text().strip() if self.tabela.item(row, 2) else ''
+            aliquota_bruta = self.tabela.item(row, 4).text().strip() if self.tabela.item(row, 4) else ''
+            
+            if not aliquota_bruta:
+                linhas_pendentes.append(f"Linha {row + 1}: {produto}")
+        
+        if linhas_pendentes:
+            mensagem_erro = "As seguintes alíquotas precisam ser preenchidas:\n\n"
+            
+            if len(linhas_pendentes) <= 10:
+                mensagem_erro += "\n".join(linhas_pendentes)
+            else:
+                mensagem_erro += "\n".join(linhas_pendentes[:10])
+                mensagem_erro += f"\n\n... e mais {len(linhas_pendentes) - 10} produtos."
+            
+            mensagem_erro += "\n\nPreencha todas as alíquotas antes de salvar."
+            
+            QMessageBox.warning(
+                self, 
+                "Alíquotas Pendentes", 
+                mensagem_erro
+            )
+            
+            self._destacar_linhas_pendentes()
+            return
+        
         print("[SALVAR] Iniciando atualização de alíquotas")
         conexao = conectarBanco()
         cursor = conexao.cursor()
@@ -142,6 +191,23 @@ class PopupAliquota(QDialog):
         finally:
             cursor.close()
             fecharBanco(conexao)
+
+    def _destacar_linhas_pendentes(self):
+        """Destaca visualmente as linhas com alíquotas pendentes"""
+        for row in range(self.tabela.rowCount()):
+            aliquota_item = self.tabela.item(row, 4)
+            if not aliquota_item or not aliquota_item.text().strip():
+                # Destaca a linha inteira em vermelho claro
+                for col in range(self.tabela.columnCount()):
+                    item = self.tabela.item(row, col)
+                    if item:
+                        item.setBackground(QtGui.QColor(255, 200, 200))  # Vermelho claro
+            else:
+                # Remove o destaque se a alíquota foi preenchida
+                for col in range(self.tabela.columnCount()):
+                    item = self.tabela.item(row, col)
+                    if item:
+                        item.setBackground(QtGui.QColor(255, 255, 255))  # Branco
 
     def exportar_planilha_modelo(self):
         caminho, _ = QFileDialog.getSaveFileName(self, "Salvar Planilha Modelo", "Tributacao.xlsx", "Arquivos Excel (*.xlsx)")

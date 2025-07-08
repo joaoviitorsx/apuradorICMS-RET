@@ -1,20 +1,23 @@
+import asyncio
 import xlsxwriter
 from PySide6.QtCore import QThread, Signal
 from utils.aliquota import formatarAliquota
 from utils.conversao import Conversor
 from db.conexao import conectarBanco, fecharBanco
+from services.spedService.pos_processamento import etapas_pos_processamento
 
 class ExportWorker(QThread):
     progress = Signal(int)
     finished = Signal(str)
     erro = Signal(str)
 
-    def __init__(self, empresa_id, mes, ano, caminho_arquivo):
+    def __init__(self, empresa_id, mes, ano, caminho_arquivo, janela_pai=None):
         super().__init__()
         self.empresa_id = empresa_id
         self.mes = mes
         self.ano = ano
         self.caminho_arquivo = caminho_arquivo
+        self.janela_pai = janela_pai
 
     def run(self):
         try:
@@ -33,8 +36,17 @@ class ExportWorker(QThread):
                 WHERE empresa_id = %s AND (aliquota IS NULL OR TRIM(aliquota) = '')
             """, (self.empresa_id,))
             if cursor.fetchall():
-                self.erro.emit("Existem produtos com alíquotas nulas. Verifique antes de exportar.")
-                return
+                print("[EXPORT] Alíquotas nulas detectadas. Executando pós-processamento...")
+                cursor.close()
+                fecharBanco(conexao)
+                
+                asyncio.run(self.executarPosProcessamento())
+                
+                conexao = conectarBanco()
+                if not conexao:
+                    self.erro.emit("Não foi possível reconectar ao banco de dados.")
+                    return
+                cursor = conexao.cursor()
 
             cursor.execute("""
                 SELECT DISTINCT 
@@ -131,3 +143,17 @@ class ExportWorker(QThread):
                 fecharBanco(conexao)
             except:
                 pass
+            
+    async def executarPosProcessamento(self):
+        try:
+            class MockProgressBar:
+                def setValue(self, value):
+                    pass
+            
+            mock_progress = MockProgressBar()
+            await etapas_pos_processamento(self.empresa_id, mock_progress, self.janela_pai)
+            print("[EXPORT] Pós-processamento concluído. Continuando exportação...")
+            
+        except Exception as e:
+            print(f"[EXPORT] Erro durante pós-processamento: {e}")
+            raise e
